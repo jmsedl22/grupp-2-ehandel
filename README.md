@@ -5,7 +5,7 @@ Gruppuppgift för kurs i Python. Projektet ska bygga upp en e-handelsrapport uti
 Vår överenskomna arbetsgång från projektet är:
 
 - Läs issue-specifikationen
-- Skapa branch från uppdaterad main (kör: git switch main, git pull, git switch -c [namn]/[beskrivning-av-arbete])
+- Skapa lokal branch från uppdaterad main (kör: git switch main, git pull, git switch -c [namn]/[beskrivning-av-arbete])
 - Lös issuen
 - Testa att lösningen fungerar (dvs. att programmet körs)
 - Gör en commit med ett beskrivande meddelande (kör: git commit -m "[beskrivning]")
