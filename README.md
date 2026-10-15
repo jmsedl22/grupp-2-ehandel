@@ -1,22 +1,18 @@
-# grupp-2-ehandel
-Gruppuppgift för kurs i Python. Projektet ska bygga upp en e-handelsrapport utifrån givna data.
+# Group 2 E-commerce analysis report
+Group assignment for a course in PYthon programming. The project aims to build an e-commerce report in a Jupyter Notebook, given sample data from a csv file.
 
-## Arbetssätt
-Vår överenskomna arbetsgång från projektet är:
+## Workflow
+Our agreed-upon workflow is as follows:
 
-- Läs issue-specifikationen
-- Skapa lokal branch från uppdaterad main (kör: git switch main, git pull, git switch -c [namn]/[beskrivning-av-arbete])
-- Lös issuen
-- Testa att lösningen fungerar (dvs. att programmet körs)
-- Gör en commit med ett beskrivande meddelande (kör: git commit -m "[beskrivning]")
-- Pusha upp din kod (kör: git push)
-- Öppna upp en Pull Request och länka till issuen
-- Beskriv kort dina ändringar
-- Låt övriga gruppmedlemmar granska ändringen
-- Åtgärda eventuell återkoppling
-- Merga Pull Requesten när den är godkänd
-- Skriv en kort dokumentation i issuen om vad som gjorts och om ni testat
-- Stäng issuen genom att markera som "Done"
-
-## Ansvar
-.
+- Read the issue specification.
+- Create a local branch from an updated main (git switch main, git pull, git switch -c [name]/[description-of-work]).
+- Solve the issue.
+- Test the solution.
+- Make a commit with a descriptive message (git commit -m "[description]").
+- Push your code to remote (git push).
+- Open a pull request link the issue by adding "References #[issue number]" or "Solves #[issue number]" to the PR description. (If you write 'solves' or 'closes', GitHub will automatically close the issue. Write 'references' if you don't want it closed yet.)
+- Briefly describe your changes.
+- Let the group examine and approve your changes.
+  - Fix any follow-up.
+- Merge the pull request when it is approved.
+- Close the issue by marking it as 'done.'
