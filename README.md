@@ -31,20 +31,20 @@ Our agreed-upon workflow is as follows:
 
 1. Read the issue specification.
 2. Create a local branch from an updated main. In order, run the following:
-  - `git switch main`
-  - `git pull --ff-only`
-  - `git switch -c [name]/[description-of-work]`
+    - `git switch main`
+    - `git pull --ff-only`
+    - `git switch -c [name]/[description-of-work]`
 3. Solve the issue.
 4. Test the solution (the program must run).
 5. Make a commit with a descriptive message:
-  - `git commit -m "[description]"`
+    - `git commit -m "[description]"`
 6. Push your code to remote (`git push`).
 7. Open a pull request and link the issue by adding "References #[issue number]" or "Solves #[issue number]" to the PR description.
-  - Writing 'Solves' or 'Closes' will automatically close the related issue when the PR is merged.
-  - Writing 'References' will simply link the issue.
+    - Writing 'Solves' or 'Closes' will automatically close the related issue when the PR is merged.
+    - Writing 'References' will simply link the issue.
 8. Briefly describe your changes in the pull request description.
 9. Let the group examine and approve your changes.
-  - Fix or address any feedback.
+    - Fix or address any feedback.
 10. Merge the pull request when it is approved.
 
 ## Responsibilities
