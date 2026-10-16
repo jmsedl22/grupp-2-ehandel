@@ -48,7 +48,12 @@ Our agreed-upon workflow is as follows:
 10. Merge the pull request when it is approved.
 
 ## Responsibilities
-Individual responsibilities will be documented as they are decided. 
+Responsibilities are divided by file: 
+- Charlie - io_utils.py
+- Katerina - metrics.py
+- Natasa - viz.py
+- (Empty) - ecommerce_sales.ipynb
+- Jacob - README.md (documentation), and final check 
 
 ## Project structure
 The project structure follows the proposed template given in the assignment description. 
