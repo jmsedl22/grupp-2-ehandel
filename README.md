@@ -26,6 +26,38 @@ As per the assignment, the analysis part of this assignment aims to answer:
 5. Top lists (Top 3 categories based on revenue.)
 6. Deviations (Other patterns that stand out.) 
 
+## Setting up the project
+
+### Dependencies
+- Python version 3.14.17
+- Git
+
+Older Python versions or operating systems other than Windows 11 have not been verified.
+
+### 1. Creating a virtual environment
+```sh
+python -m venv .venv
+```
+### 2. Activating the virtual environment
+Using Windows PowerShell:
+```sh
+.\.venv\Scripts\Activate.ps1
+```
+On macOS or Linux:
+```sh
+source .venv/bin/activate
+```
+
+### 3. Installing dependencies
+```sh
+python -m pip install -r requirements.txt
+```
+
+### 4. Opening the notebook
+```sh
+python -m jupyterlab
+```
+
 ## Workflow
 Our agreed-upon workflow is as follows:
 
