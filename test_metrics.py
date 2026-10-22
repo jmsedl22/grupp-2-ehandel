@@ -1,17 +1,26 @@
 import pandas as pd
+from src.metrics import calculate_total_revenue
+from src.metrics import calculate_total_units
 from src.metrics import calculate_total_revenue_units
 
-#Test total revenue and units calculation
 
+#Test of function - combine the results of the two previous functions
 def test_calculate_total_revenue_units():
-
-
-    df = pd.DataFrame(                                             # create a sample df
-    {"revenue":[200, 300, 700, 900], 
-     "units":[4,0,7,2]}   
+    # create a sample df
+    df = pd.DataFrame(                                             
+    {"revenue":[200, 
+                300, 
+                700,
+                900], 
+     "units":[4,
+              0,
+              7,
+              2]}   
     )
 
+    # call the function and unpack the returned tuple
     total_revenue, total_units = calculate_total_revenue_units(df)
 
-    assert total_units == 13                                       # chech if the results are correct
+    # check if the results are correct
+    assert total_units == 13                                       
     assert total_revenue == 2100
