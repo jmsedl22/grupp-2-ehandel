@@ -1,6 +1,11 @@
 
-#count the total number of orders
+import pandas as pd
 
-def count_orders(df):
-    count_orders = df["order_id"].nunique()       # nuninque - to avoid counting duplicates
-    return count_orders                           # return the total number of orders
+
+# count the total number of orders
+def count_orders(df: pd.DataFrame) -> int:
+    # nuninque - to avoid counting duplicates
+    count_orders = df["order_id"].nunique()      
+    
+    # return the total number of orders
+    return count_orders                           
