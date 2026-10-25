@@ -64,6 +64,57 @@ def group_revenue(df: pd.DataFrame, group_by: str) -> pd.DataFrame:
     return group        
 
 
+# return selctiv result av group_revenue
+def revenue_by_city(df: pd.DataFrame) -> pd.DataFrame:
+    return group_revenue(df, "city")
+
+def revenue_top_3_cities(df: pd.DataFrame)  -> pd.DataFrame:
+    return group_revenue(df, "city").head(3)
+
+def revenue_by_category(df: pd.DataFrame)  -> pd.DataFrame:
+    return group_revenue(df, "category")
+
+def revenue_top_3_categories(df: pd.DataFrame)  -> pd.DataFrame:
+    return group_revenue(df, "category").head(3)
+
+def revenue_by_month(df:pd.DataFrame)  -> pd.DataFrame:
+    group_month = group_revenue(
+        df, pd.Grouper(key="date", freq="MS"))
+    
+    group_month = group_month[group_month["revenue"] != 0]
+
+    # chenges soted ordning
+    group_month = group_month.sort_values(by = "date")
+    # chenges namns on date column
+    group_month["date"] = group_month["date"].dt.strftime("%B %Y")
+
+    return group_month
+
+
+def revenue_by_weekday(df:pd.DataFrame)  -> pd.DataFrame:
+
+    # create ny df
+    group_weekday = group_revenue(
+        df.assign(weekday=df["date"].dt.dayofweek), "weekday")
+    
+    # chenges soted ordning
+    group_weekday = group_weekday.sort_values(by = "weekday")
+
+    # change namns i column
+    days = {0: "Monday",
+            1: "Tuesday",
+            2: "Wenedsday",
+            3: "Thursday",
+            4: "Friday",
+            5: "Saturday",
+            6: "Sunday"
+                }
+
+    # chenges namns on date column
+    group_weekday["weekday"] = group_weekday["weekday"].map(days)
+
+    return group_weekday
+
 # 
 def calculate_order_value_distribution(df: pd.DataFrame) -> dict[str:float] :
     orders_total_revenues = group_revenue(df, "order_id")
