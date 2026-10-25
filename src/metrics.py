@@ -63,6 +63,8 @@ def revenue_by_month(df:pd.DataFrame)  -> pd.DataFrame:
     group_month = group_revenue(
         df, pd.Grouper(key="date", freq="MS"))
     
+    group_month = group_month[group_month["revenue"] != 0]
+
     # chenges soted ordning
     group_month = group_month.sort_values(by = "date")
     # chenges namns on date column
@@ -75,20 +77,20 @@ def revenue_by_weekday(df:pd.DataFrame)  -> pd.DataFrame:
 
     # create ny df
     group_weekday = group_revenue(
-        df.assing(weekday=df["data"].dt.dayofweek), "weekday")
+        df.assign(weekday=df["date"].dt.dayofweek), "weekday")
     
     # chenges soted ordning
     group_weekday = group_weekday.sort_values(by = "weekday")
 
     # change namns i column
-    days = map({0: "Monday",
-                1: "Tuesday",
-                2: "Wendsday",
-                3: "Thursday",
-                4: "Friday",
-                5: "Saturday",
-                6: "Sunday"
-                })
+    days = {0: "Monday",
+            1: "Tuesday",
+            2: "Wenedsday",
+            3: "Thursday",
+            4: "Friday",
+            5: "Saturday",
+            6: "Sunday"
+                }
 
     # chenges namns on date column
     group_weekday["weekday"] = group_weekday["weekday"].map(days)

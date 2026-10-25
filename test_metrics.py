@@ -187,3 +187,60 @@ def test_revenue_top_3_cities():
         # check total revenue and sorting order
         assert result["revenue"].tolist() == [600, 400, 100]
         assert result["city"].tolist() == ["Malmö", "Uppsala", "Stockholm"]
+
+
+from src.metrics import revenue_by_month
+
+
+def test_revenue_by_month():
+     # create sample sales date
+         df = pd.DataFrame({
+             "date":pd.to_datetime(["2026-10-25", 
+                     "2026-01-26", 
+                     "2024-10-25", 
+                     "2024-01-12", 
+                     "2024-01-10",
+                     "2024-01-26"]),
+             "revenue":[100, 
+                        200, 
+                        300, 
+                        400,
+                        50, 
+                        100]
+         })
+     
+         # group revenue by date
+         result = revenue_by_month(df)
+     
+         # check total revenue and sorting order
+         assert result["revenue"].tolist() == [550, 300, 200, 100]
+         assert result["date"].tolist() == ["January 2024", "October 2024","January 2026", "October 2026"]
+     
+from src.metrics import revenue_by_weekday
+
+
+def test_revenue_by_weekday():
+     # create sample sales date
+         df = pd.DataFrame({
+             "date":pd.to_datetime([
+                     "2026-10-25", 
+                     "2026-01-26", 
+                     "2024-10-25", 
+                     "2024-01-12", 
+                     "2024-01-10",
+                     "2024-01-26"]),
+             "revenue":[100, 
+                        200, 
+                        300, 
+                        400,
+                        50, 
+                        100]
+         })
+     
+         # group revenue by weekday
+         result = revenue_by_weekday(df)
+     
+         # check total revenue and sorting order
+         assert result["revenue"].tolist() == [200, 50, 800, 100]
+         assert result["weekday"].tolist() == ["Monday", "Wenedsday","Friday", "Sunday"]
+     
