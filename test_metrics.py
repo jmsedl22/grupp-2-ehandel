@@ -105,6 +105,10 @@ def test_group_revenue_by_category():
     assert result["category"].tolist() == ["Toys", "Sport", "Home"]
     
 
+from src.metrics import calculate_order_value_distribution
+
+
+def test_order_value_distribution():
 from src.metrics import calculate_aov
 
 
@@ -115,6 +119,29 @@ def test_calculate_aov():
         "order_id":[101,
                     102,
                     103,
+                    103,
+                    103],
+            "date":["2024-04-16", 
+                    "2024-04-12", 
+                    "2024-05-16", 
+                    "2024-04-12", 
+                    "2024-05-16"],
+            "revenue":[100, 
+                       200, 
+                       300, 
+                       400, 
+                       100]
+        })
+
+     # 
+    result = calculate_order_value_distribution(df)
+    
+     # check min, max, median
+    assert result == {
+        "min_revenue": 100,
+        "max_revenue" : 800,
+        "median_revenue" : 200
+    }
                     103],
         "revenue":[200,
                    300,
