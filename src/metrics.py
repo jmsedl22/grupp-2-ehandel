@@ -218,7 +218,7 @@ def calculate_order_ranges(df: pd.DataFrame) -> pd.DataFrame:
     # Create a Data Frame with order counts and percentages
     result = pd.DataFrame(
         {
-            "count": counts,
+            "number of orders": counts,
             "percentages" :count_procent
         }
     )
