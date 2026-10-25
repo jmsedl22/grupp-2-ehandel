@@ -44,3 +44,19 @@ def group_revenue(df: pd.DataFrame, group_by: str) -> pd.DataFrame:
     group = group.sort_values(by="revenue", ascending=False)                
 
     return group        
+
+
+# return selctiv result av group_revenue
+def revenue_by_city(df: pd.DataFrame) -> pd.DataFrame:
+    return group_revenue(df, "city")
+
+def revenue_top_3_cities(df: pd.DataFrame)  -> pd.DataFrame:
+    return group_revenue(df, "city").head(3)
+
+def revenue_by_category(df: pd.DataFrame)  -> pd.DataFrame:
+    return group_revenue(df, "category")
+
+def revenue_top_3_categories(df: pd.DataFrame)  -> pd.DataFrame:
+    return group_revenue(df, "category").head(3)
+
+
