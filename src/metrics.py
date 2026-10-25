@@ -116,7 +116,7 @@ def revenue_by_weekday(df:pd.DataFrame)  -> pd.DataFrame:
     return group_weekday
 
 # 
-def calculate_order_value_distribution(df: pd.DataFrame) -> dict[str:float] :
+def calculate_order_value_distribution(df: pd.DataFrame) -> dict[str, float] :
     orders_total_revenues = group_revenue(df, "order_id")
     min_revenue = orders_total_revenues["revenue"].min()
     max_revenue = orders_total_revenues["revenue"].max()
@@ -128,3 +128,43 @@ def calculate_order_value_distribution(df: pd.DataFrame) -> dict[str:float] :
         "max_revenue" : max_revenue,
         "median_revenue" : median_revenue
     }
+
+
+def calculate_order_ranges(df: pd.DataFrame) -> pd.DataFrame:
+    stats = calculate_order_value_distribution(df)
+    min_revenue = stats["min_revenue"]
+    max_revenue = stats["max_revenue"]
+    median_revenue = stats["median_revenue"]
+    distance = min(
+        median_revenue - min_revenue,
+        max_revenue - median_revenue)
+    a = distance * 0.2
+    middle_lower = median_revenue - a
+    middle_upper = median_revenue + a
+    lower_split = (min_revenue + middle_lower)/2
+    upper_split = (middle_upper + max_revenue)/2
+
+    from_to = [
+        min_revenue,
+        lower_split,
+        middle_lower,
+        middle_upper,
+        upper_split,
+        max_revenue
+    ]
+    if len(set(from_to))<len(from_to):
+        from_to = sorted(set(from_to))
+    orders = group_revenue(df, "order_id")
+    orders["revenue_group"] = pd.cut(
+                                orders["revenue"],
+                                bins = from_to,
+                                labels =[ "group 1", "group 2","group 3", "group 4" ,"group 5"],
+                                include_lowest=True)
+    counts = orders["revenue_group"].value_counts()
+    count_procent = counts /len(orders)*100
+
+    result = pd.DataFrame({
+        "count": counts,
+        "percentages" :count_procent
+    })
+    return result
