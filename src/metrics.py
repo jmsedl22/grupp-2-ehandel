@@ -8,26 +8,26 @@ def calculate_aov(df: pd.DataFrame)  -> float:
     # use results from functions calculate_total_revenue(df) and count_orders
     total_revenue = calculate_total_revenue(df)
     total_orders = count_orders(df)
-    
+
     # avoid division by zero
-    if total_orders == 0:                              
+    if total_orders == 0:
         return 0.0
 
     # calculate AOV
-    aov = total_revenue/total_orders 
+    aov = total_revenue/total_orders
 
     return aov
 
 # count the total number of orders
 def count_orders(df: pd.DataFrame) -> int:
     # nuninque - to avoid counting duplicates
-    count_orders = df["order_id"].nunique()      
-    
+    count_orders = df["order_id"].nunique()
+
     # return the total number of orders
-    return count_orders  
+    return count_orders
 
 
-# Calculate total revenue 
+# Calculate total revenue
 def calculate_total_revenue(df:pd.DataFrame) -> float:
     # Sum all values in the column "revenue"
     total_revenue = sum(df["revenue"])
@@ -38,8 +38,8 @@ def calculate_total_revenue(df:pd.DataFrame) -> float:
 
 # Calculate total number of units sold
 def calculate_total_units(df:pd.DataFrame) -> int:
-    # Sum all values in the column "units"   
-    total_units = sum(df["units"])       
+    # Sum all values in the column "units"
+    total_units = sum(df["units"])
 
     # Returas calculeted total units
     return (total_units)
@@ -47,21 +47,21 @@ def calculate_total_units(df:pd.DataFrame) -> int:
 
 # Combine the results of the two previous functions
 def calculate_total_revenue_units(df:pd.DataFrame) -> tuple[float, int]:
-    
+
     # Returas both results as tuple
     return calculate_total_revenue(df), calculate_total_units(df)
 
 
 # Group revenue by a selected column
-def group_revenue(df: pd.DataFrame, group_by: str) -> pd.DataFrame: 
+def group_revenue(df: pd.DataFrame, group_by: str) -> pd.DataFrame:
 
     # calculate total revenue for each group
-    group = df.groupby(group_by, as_index= False)["revenue"].sum()   
+    group = df.groupby(group_by, as_index= False)["revenue"].sum()
 
-    # sort groups by total revenue (highest to lower)   
-    group = group.sort_values(by="revenue", ascending=False)                
+    # sort groups by total revenue (highest to lower)
+    group = group.sort_values(by="revenue", ascending=False)
 
-    return group        
+    return group
 
 
 # return selctiv result av group_revenue
@@ -80,7 +80,7 @@ def revenue_top_3_categories(df: pd.DataFrame)  -> pd.DataFrame:
 def revenue_by_month(df:pd.DataFrame)  -> pd.DataFrame:
     group_month = group_revenue(
         df, pd.Grouper(key="date", freq="MS"))
-    
+
     group_month = group_month[group_month["revenue"] != 0]
 
     # chenges soted ordning
@@ -96,7 +96,7 @@ def revenue_by_weekday(df:pd.DataFrame)  -> pd.DataFrame:
     # create ny df
     group_weekday = group_revenue(
         df.assign(weekday=df["date"].dt.dayofweek), "weekday")
-    
+
     # chenges soted ordning
     group_weekday = group_weekday.sort_values(by = "weekday")
 
@@ -115,7 +115,7 @@ def revenue_by_weekday(df:pd.DataFrame)  -> pd.DataFrame:
 
     return group_weekday
 
-# 
+#
 def calculate_order_value_distribution(df: pd.DataFrame) -> dict[str:float] :
     orders_total_revenues = group_revenue(df, "order_id")
     min_revenue = orders_total_revenues["revenue"].min()
