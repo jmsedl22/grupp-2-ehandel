@@ -103,4 +103,87 @@ def test_group_revenue_by_category():
     # check total revenue and sorting order
     assert result["revenue"].tolist() == [600, 400, 100]
     assert result["category"].tolist() == ["Toys", "Sport", "Home"]
+
+from src.metrics import revenue_by_category
+#group revenue by category
+def test_revenue_by_category():
+    # create sample sales data
+    df = pd.DataFrame({
+        "category":["Home", "Toys", "Sport", "Toys", "Sport", "Pets"],
+        "revenue":[100, 200, 300, 400, 100, 800]
+    })
+
+    # group revenue by category
+    result = revenue_by_category(df)
+
+    # check total revenue and sorting order
+    assert result["revenue"].tolist() == [800, 600, 400, 100]
+    assert result["category"].tolist() == ["Pets", "Toys", "Sport", "Home"]
+
+
+from src.metrics import revenue_top_3_categories
+#group revenue by category
+def test_revenue_top_3_categories():
+    # create sample sales data
+    df = pd.DataFrame({
+        "category":["Home", "Toys", "Sport", "Toys", "Sport", "Pets"],
+        "revenue":[100, 200, 300, 400, 100, 800]
+    })
+
+    # group revenue by category
+    result = revenue_top_3_categories(df)
+
+    # check total revenue and sorting order
+    assert result["revenue"].tolist() == [800, 600, 400]
+    assert result["category"].tolist() == ["Pets", "Toys", "Sport"]
     
+    
+from src.metrics import revenue_by_city
+def test_revenue_by_city():
+    # create sample sales data
+        df = pd.DataFrame({
+            "city":["Stockholm", 
+                    "Malmö", 
+                    "Uppsala", 
+                    "Malmö",
+                    "Dalby", 
+                    "Uppsala"],
+            "revenue":[100, 
+                       200, 
+                       300, 
+                       400,
+                       50, 
+                       100]
+        })
+    
+        # group revenue by city
+        result = revenue_by_city(df)
+    
+        # check total revenue and sorting order
+        assert result["revenue"].tolist() == [600, 400, 100, 50]
+        assert result["city"].tolist() == ["Malmö", "Uppsala", "Stockholm", "Dalby"]
+
+from src.metrics import revenue_top_3_cities
+def test_revenue_top_3_cities():
+    # create sample sales data
+        df = pd.DataFrame({
+            "city":["Stockholm", 
+                    "Malmö", 
+                    "Uppsala", 
+                    "Malmö",
+                    "Dalby", 
+                    "Uppsala"],
+            "revenue":[100, 
+                       200, 
+                       300, 
+                       400,
+                       50, 
+                       100]
+        })
+    
+        # group revenue by city
+        result = revenue_top_3_cities(df)
+    
+        # check total revenue and sorting order
+        assert result["revenue"].tolist() == [600, 400, 100]
+        assert result["city"].tolist() == ["Malmö", "Uppsala", "Stockholm"]
