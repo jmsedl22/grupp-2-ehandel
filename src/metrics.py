@@ -200,12 +200,14 @@ def calculate_order_ranges(df: pd.DataFrame) -> pd.DataFrame:
             index=["group1"],
         )
 
-    labels = ["group 1", "group 2", "group 3", "group 4" , "group 5",]
+    labels = [f"{from_to[i]: .2f} - {from_to[i+1]:.2f}"
+              for i in range (len(from_to) - 1)
+    ]
     # Divide orders into revenue groups based on the defined boudaries
     orders["revenue_group"] = pd.cut(
         orders["revenue"],
         bins=from_to,
-        labels=labels[: len(from_to) - 1],
+        labels=labels,
         include_lowest=True,
     )
 
