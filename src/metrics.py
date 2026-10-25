@@ -115,6 +115,7 @@ def revenue_by_weekday(df:pd.DataFrame)  -> pd.DataFrame:
 
     return group_weekday
 
+
 #
 def calculate_order_value_distribution(df: pd.DataFrame) -> dict[str:float] :
     orders_total_revenues = group_revenue(df, "order_id")
