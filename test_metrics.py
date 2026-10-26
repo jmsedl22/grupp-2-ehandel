@@ -187,7 +187,7 @@ def test_revenue_by_weekday():
      
          # Verify total revenue for each weekday and weekday order
          assert result["revenue"].tolist() == [200, 50, 800, 100]
-         assert result["weekday"].tolist() == ["Monday", "Wenedsday","Friday", "Sunday"]
+         assert result["weekday"].tolist() == ["Monday", "Wednesday","Friday", "Sunday"]
      
 
 # Test calculating the distributionof order values
@@ -253,7 +253,7 @@ def test_calculate_order_ranges():
     result = calculate_order_ranges(df)
 
     # Verify order counts, number of ranges and total percentage
-    assert result["count"].sum() == 5
+    assert result["number of orders"].sum() == 5
     assert len(result) == 5
     assert round(result["percentages"].sum(),2)==100
 
