@@ -194,7 +194,7 @@ def calculate_order_ranges(df: pd.DataFrame) -> pd.DataFrame:
     if min_revenue == max_revenue:
         return pd.DataFrame(
             {
-                "count": [len(orders)],
+                "number of orders": [len(orders)],
                 "percentages": [100.0],
             },
             index=["group1"],
