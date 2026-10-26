@@ -1,12 +1,12 @@
 from pathlib import Path
 from typing import TypedDict
 
-import pandas
+from pandas import DataFrame
 
 from io_utils import load_data
 
 
-# Return type of the Summery() function, as a typed dictionary
+# Return type of the Summery() function as a typed dictionary
 class SummaryData(TypedDict):
     total_revenue: float
     total_units: int
@@ -14,11 +14,18 @@ class SummaryData(TypedDict):
     aov: float
 
 
+# Return type of the order_value_distribution() function as a typed dictionary.
+class OrderValueDistributionData(TypedDict):
+    min_revenue: float
+    median_revenue: float
+    max_revenue: float
+
+
 # Class CommerceAnalyzer
 # Functions as an interface between the notebook and util functions
 class CommerceAnalyzer:
     file_path: str | Path
-    dataframe: pandas.DataFrame
+    dataframe: DataFrame
 
 
     def __init__(self, file_path: str | Path) -> None:
@@ -27,4 +34,20 @@ class CommerceAnalyzer:
 
 
     def summary(self) -> SummaryData:  # type: ignore
+        pass
+
+
+    def revenue_by_category(self) -> DataFrame:  # type: ignore
+        pass
+
+
+    def revenue_by_month(self) -> DataFrame:  # type: ignore
+        pass
+
+
+    def revenue_top_3_categories(self) -> DataFrame:  # type: ignore
+        pass
+
+
+    def order_value_distribution(self) -> DataFrame:  # type: ignore
         pass
