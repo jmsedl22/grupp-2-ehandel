@@ -116,7 +116,7 @@ def revenue_by_weekday(df: pd.DataFrame)  -> pd.DataFrame:
     days = {
         0: "Monday",
         1: "Tuesday",
-        2: "Wenedsday",
+        2: "Wednesday",
         3: "Thursday",
         4: "Friday",
         5: "Saturday",
