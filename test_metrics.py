@@ -162,7 +162,7 @@ def test_revenue_top_3_cities():
 def test_revenue_by_month():
      # Create sample sales date with dates and revenue
          df = pd.DataFrame({
-             "date":pd.to_datetime(["2026-10-25", "2026-01-26", "2024-10-25", "2024-01-12", "2024-01-10", "2024-01-26"]),
+             "date":pd.to_datetime(["2025-10-25", "2025-01-26", "2024-10-25", "2024-01-12", "2024-01-10", "2024-01-26"]),
              "revenue":[100, 200, 300, 400, 50, 100]
          })
      
@@ -170,8 +170,10 @@ def test_revenue_by_month():
          result = revenue_by_month(df)
      
          # Verify total revenue for each month and sorting order
-         assert result["revenue"].tolist() == [550, 300, 200, 100]
-         assert result["date"].tolist() == ["January 2024", "October 2024","January 2026", "October 2026"]
+         assert result["revenue"].tolist() == [550, 0, 0, 0, 0, 0, 0, 0, 0, 300, 0, 0,  200, 0, 0, 0, 0, 0, 0, 0, 0, 100]
+         assert result["date"].tolist() == [ "January 2024", "February 2024", "March 2024", "April 2024", "May 2024", "June 2024", "July 2024", "August 2024", "September 2024", "October 2024", "November 2024", "December 2024",
+                                            "January 2025", "February 2025", "March 2025", "April 2025", "May 2025", "June 2025", "July 2025", "August 2025", "September 2025", "October 2025",
+                                            ]
      
 
 # Test calculeting revenue by weekdays

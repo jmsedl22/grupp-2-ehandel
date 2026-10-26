@@ -90,9 +90,6 @@ def revenue_by_month(df: pd.DataFrame)  -> pd.DataFrame:
     group_month = group_revenue(
         df, pd.Grouper(key="date", freq="MS"))
     
-    # Remove month with zero revenue
-    group_month = group_month.loc[group_month["revenue"] != 0].copy()
-
     # Sort month in chronological order
     group_month = group_month.sort_values(by="date")
 
