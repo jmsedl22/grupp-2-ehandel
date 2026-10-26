@@ -224,3 +224,24 @@ def calculate_order_ranges(df: pd.DataFrame) -> pd.DataFrame:
     )
 
     return result
+
+# Calculate standard deviation of order values
+def calculate_order_value_std(df: pd.DataFrame) -> float:
+    # Calculate total revenue for each order
+    order = group_revenue(df, "order_id")
+
+    # Calculate standart deviation
+    std = order["revenue"].std()
+
+    return float(std)
+
+
+
+# Calculate variance of order values
+def calculate_order_value_variance(df: pd.DataFrame) -> float:
+    # Calculate total revenue for each order
+    orders = group_revenue(df, "order_id") 
+    variance = orders["revenue"].var()
+
+    return float(variance)
+
