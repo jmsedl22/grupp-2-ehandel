@@ -4,6 +4,7 @@ from typing import TypedDict
 from pandas import DataFrame
 
 from io_utils import load_data
+import metrics
 
 
 # Return type of the Summery() function as a typed dictionary
@@ -49,5 +50,8 @@ class CommerceAnalyzer:
         pass
 
 
-    def order_value_distribution(self) -> DataFrame:  # type: ignore
-        pass
+    def order_value_distribution(self) -> dict[str, float]:
+        result = metrics.calculate_order_value_distribution(self.dataframe)
+
+        return {key: float(value) for key, value in result.items()}
+
