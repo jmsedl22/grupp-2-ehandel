@@ -38,16 +38,16 @@ class CommerceAnalyzer:
         pass
 
 
-    def revenue_by_category(self) -> DataFrame:  # type: ignore
-        pass
+    def revenue_by_category(self) -> DataFrame:
+        return metrics.revenue_by_category(self.dataframe)
 
 
-    def revenue_by_month(self) -> DataFrame:  # type: ignore
-        pass
+    def revenue_by_month(self) -> DataFrame:  
+        return metrics.revenue_by_month(self.dataframe)
 
 
-    def revenue_top_3_categories(self) -> DataFrame:  # type: ignore
-        pass
+    def revenue_top_3_categories(self) -> DataFrame:  
+        return metrics.revenue_top_3_categories(self.dataframe)
 
 
     def order_value_distribution(self) -> dict[str, float]:
