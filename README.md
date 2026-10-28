@@ -87,6 +87,17 @@ Responsibilities are divided by file:
 - (Empty) - ecommerce_sales.ipynb
 - Jacob - README.md (documentation), and final check 
 
+## Architecture
+
+```mermaid
+flowchart TD
+    N("Notebook report file") --> E("ecommerce.py")
+    
+    E -->|Key indicators|   M("metrics.py")
+    E -->|Diagrams|         V("viz.py")
+    E -->|Data loading|     IO("io_utils.py")
+```
+
 ## Project structure
 The project structure follows the proposed template given in the assignment description. 
 ```
