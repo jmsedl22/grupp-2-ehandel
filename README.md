@@ -92,11 +92,11 @@ The ecommerce.py file contains a class CommerceAnalyzer, that acts as an interfa
 
 ```mermaid
 flowchart TD
-    N("Notebook report file") --> E("ecommerce.py")
+    N("Notebook report file") -->|CommerceAnalyzer| E("ecommerce.py")
     
-    E -->|Key indicators|   M("metrics.py")
-    E -->|Diagrams|         V("viz.py")
-    E -->|Data loading|     IO("io_utils.py")
+    E -->|Key indicators| M("metrics.py")
+    E -->|Diagrams| V("viz.py")
+    E -->|Data loading| IO("io_utils.py")
 ```
 
 ## Project structure
