@@ -88,6 +88,7 @@ Responsibilities are divided by file:
 - Jacob - README.md (documentation), and final check 
 
 ## Architecture
+The ecommerce.py file contains a class CommerceAnalyzer, that acts as an interface and coordinator to the notebook. It then assists in presenting the results in the report.
 
 ```mermaid
 flowchart TD
