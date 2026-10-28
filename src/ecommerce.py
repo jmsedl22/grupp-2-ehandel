@@ -55,3 +55,5 @@ class CommerceAnalyzer:
 
         return {key: float(value) for key, value in result.items()}
 
+    def revenue_by_city(self) -> DataFrame: 
+        return metrics.revenue_by_city(self.dataframe)
