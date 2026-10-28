@@ -148,47 +148,13 @@ def calculate_order_value_distribution(df: pd.DataFrame) -> dict[str, float]:
 
 # Calculate revenue ranges for order distribution
 def calculate_order_ranges(df: pd.DataFrame) -> pd.DataFrame:
-    # Get order revenue statistics
-    stats = calculate_order_value_distribution(df)
+    from_to = _calculate_order_boundaries(df)
 
-    # Extract minimum, maximum and median revenue
-    min_revenue = stats["min_revenue"]
-    max_revenue = stats["max_revenue"]
-    median_revenue = stats["median_revenue"]
-
-    # Find the smaller distance between the median and the revenues limits
-    distance = min(
-        median_revenue - min_revenue,
-        max_revenue - median_revenue
-    )
-    # Calculate a margin of 20 percent around the median
-    margin = distance * 0.2
-
-    # Calculate the lower and upper boundaries around the median
-    middle_lower = median_revenue - margin
-    middle_upper = median_revenue + margin
-    # Calculate the midpoints of the lower and upper revenue ranges
-    lower_split = (min_revenue + middle_lower) / 2
-    upper_split = (middle_upper + max_revenue) / 2
-
-    # Define boundaries for the revenue ranges
-    from_to = [
-        min_revenue,
-        lower_split,
-        middle_lower,
-        middle_upper,
-        upper_split,
-        max_revenue,
-    ]
-
-    # Remove duplicate boundaries to ensure unique intervals
-    if len(set(from_to)) < len(from_to):
-        from_to = sorted(set(from_to))
     # Calculate total revenue for each order
     orders = group_revenue(df, "order_id")
 
     # Handle orders with identical revenue values
-    if min_revenue == max_revenue:
+    if len(from_to) == 1:
         return pd.DataFrame(
             {
                 "number of orders": [len(orders)],
@@ -233,6 +199,10 @@ def calculate_order_value_std(df: pd.DataFrame) -> float:
     return float(std)
 
 
+def get_order_range_boundaries(df:pd.DataFrame) -> list[float]:
+    # return revenue range boundaries for plotting
+    return _calculate_order_boundaries(df)
+
 
 # Calculate variance of order values
 def calculate_order_value_variance(df: pd.DataFrame) -> float:
@@ -241,4 +211,45 @@ def calculate_order_value_variance(df: pd.DataFrame) -> float:
     variance = orders["revenue"].var()
 
     return float(variance)
+
+
+# Calculate and returns order revenue boundaries
+def _calculate_order_boundaries(df: pd.DataFrame) -> list[float]:
+    # Get order revenue statistics
+    stats = calculate_order_value_distribution(df)
+
+    # Extract minimum, maximum and median revenue
+    min_revenue = stats["min_revenue"]
+    max_revenue = stats["max_revenue"]
+    median_revenue = stats["median_revenue"]
+
+    if min_revenue == max_revenue:
+        return [float(min_revenue)]
+    
+    # Find the smaller distance between the median and the revenues limits
+    distance = min(
+        median_revenue - min_revenue,
+        max_revenue - median_revenue
+    )
+    # Calculate a margin of 20 percent around the median
+    margin = distance * 0.2
+
+    # Calculate the lower and upper boundaries around the median
+    middle_lower = median_revenue - margin
+    middle_upper = median_revenue + margin
+    # Calculate the midpoints of the lower and upper revenue ranges
+    lower_split = (min_revenue + middle_lower) / 2
+    upper_split = (middle_upper + max_revenue) / 2
+
+    # Define boundaries for the revenue ranges
+    boundaries = [
+        min_revenue,
+        lower_split,
+        middle_lower,
+        middle_upper,
+        upper_split,
+        max_revenue,
+    ]
+
+    return sorted({float(value) for value in boundaries})
 
