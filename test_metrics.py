@@ -16,6 +16,7 @@ from src.metrics import (
     revenue_by_weekday,
     revenue_top_3_categories,
     revenue_top_3_cities,
+    calulate_descriptive_statistics,
 )
 
 
@@ -286,3 +287,20 @@ def test_calculate_total_units():
 
     # Verify the expected total number of units
     assert result == 13
+
+def test_calulate_descriptive_statistics():
+    # Create sample order data with IDs and revenue
+    df = pd.DataFrame({
+        "order_id":[101, 102, 103, 104, 105],
+        "revenue":[100, 200, 100, 200, 800]
+    })
+     
+    # Calculate the 
+    result = calulate_descriptive_statistics(df)
+     
+    # Verify order counts, number of ranges and total percentage
+    assert result["mode"] == [100, 200]
+    assert result["q1"] == 100
+    assert result["q3"] == 200
+    assert result["iqr"] == 100
+    

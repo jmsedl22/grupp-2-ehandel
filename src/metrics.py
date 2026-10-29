@@ -253,3 +253,21 @@ def _calculate_order_boundaries(df: pd.DataFrame) -> list[float]:
 
     return sorted({float(value) for value in boundaries})
 
+
+# Calculate mode, quartiles and IRQ of order values
+def calulate_descriptive_statistics(df:pd.DataFrame) -> dict: 
+    orders = group_revenue(df, "order_id")
+    values = orders["revenue"]
+    if values.empty:
+        return {}
+    mode = values.mode().tolist()
+    q1 = values.quantile(0.25)
+    q3 = values.quantile(0.75)
+    iqr = q3 - q1
+
+    return {
+        "mode": mode,
+        "q1": q1,
+        "q3": q3,
+        "iqr": iqr
+    }
