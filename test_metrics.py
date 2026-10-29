@@ -17,6 +17,8 @@ from src.metrics import (
     revenue_top_3_categories,
     revenue_top_3_cities,
     calulate_descriptive_statistics,
+    calculate_order_z_scores,
+    detect_outliers,
 )
 
 
@@ -303,4 +305,34 @@ def test_calulate_descriptive_statistics():
     assert result["q1"] == 100
     assert result["q3"] == 200
     assert result["iqr"] == 100
-    
+
+
+def test_calculate_order_z_scores():
+# Create sample order data with IDs and revenue
+    df = pd.DataFrame({
+        "order_id":[101, 102, 103, 104, 105],
+        "revenue":[100, 200, 100, 200, 800]
+    })
+
+    # Calculate z-scores for test orders
+    result = calculate_order_z_scores(df)
+    result = result.sort_values("order_id")
+
+    # Verify z -scores for orders
+    assert result["z_score"].round(3).tolist() == [-0.610, -0.271, -0.610, -0.271, 1.763]
+
+def test_detect_outliers():
+    # Create sample order data with IDs and revenue
+    df = pd.DataFrame({
+        "order_id":[101, 102, 103, 104, 105, 106, 107],
+        "revenue":[10, 400, 500, 400, 500, 450, 1200]
+    })
+
+    # Detect outliers in test orders
+    result = detect_outliers(df)
+
+    # Verify that exactly two outliers was found and their order_ids
+    assert len(result) == 2
+    assert sorted(result["order_id"].tolist()) == [101, 107]
+
+
