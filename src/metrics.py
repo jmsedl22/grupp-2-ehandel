@@ -323,3 +323,10 @@ def calculate_order_z_scores(df: pd.DataFrame) -> pd.DataFrame:
     orders["z_score"] = (values - mean) / std
 
     return orders
+
+
+# Calculate the linear between units sold and revenue
+def calculate_units_revenue_correlation(df: pd.DatFrame) -> float:
+    correlation = df["units"].corr(df["revenue"])
+
+    return correlation
