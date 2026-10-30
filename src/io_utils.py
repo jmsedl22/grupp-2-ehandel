@@ -6,11 +6,10 @@ REQUIRED = [
     "price", "units", "revenue"
 ]
 
-def load_data(path: str) -> pd.DataFrame:
+def load_data(path: str | Path) -> pd.DataFrame:
     """
     Loads CSV
     """
-
     # Reads the CSV file and reports common errors.
     try:
         df = pd.read_csv(path, encoding="utf-8")
@@ -46,7 +45,6 @@ def load_data(path: str) -> pd.DataFrame:
     df = coerce_numeric(df)
 
     return df
-
 
 def coerce_numeric(df: pd.DataFrame) -> pd.DataFrame:
     out = df.copy()
