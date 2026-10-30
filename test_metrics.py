@@ -16,6 +16,10 @@ from src.metrics import (
     revenue_by_weekday,
     revenue_top_3_categories,
     revenue_top_3_cities,
+    calulate_descriptive_statistics,
+    calculate_order_z_scores,
+    detect_outliers,
+    calculate_units_revenue_correlation,
 )
 
 
@@ -286,3 +290,80 @@ def test_calculate_total_units():
 
     # Verify the expected total number of units
     assert result == 13
+
+def test_calulate_descriptive_statistics():
+    # Create sample order data with IDs and revenue
+    df = pd.DataFrame({
+        "order_id":[101, 102, 103, 104, 105],
+        "revenue":[100, 200, 100, 200, 800]
+    })
+     
+    # Calculate the 
+    result = calulate_descriptive_statistics(df)
+     
+    # Verify order counts, number of ranges and total percentage
+    assert result["mode"] == [100, 200]
+    assert result["q1"] == 100
+    assert result["q3"] == 200
+    assert result["iqr"] == 100
+
+
+def test_calculate_order_z_scores():
+# Create sample order data with IDs and revenue
+    df = pd.DataFrame({
+        "order_id":[101, 102, 103, 104, 105],
+        "revenue":[100, 200, 100, 200, 800]
+    })
+
+    # Calculate z-scores for test orders
+    result = calculate_order_z_scores(df)
+    result = result.sort_values("order_id")
+
+    # Verify z -scores for orders
+    assert result["z_score"].round(3).tolist() == [-0.610, -0.271, -0.610, -0.271, 1.763]
+
+def test_detect_outliers():
+    # Create sample order data with IDs and revenue
+    df = pd.DataFrame({
+        "order_id":[101, 102, 103, 104, 105, 106, 107],
+        "revenue":[10, 400, 500, 400, 500, 450, 1200]
+    })
+
+    # Detect outliers in test orders
+    result = detect_outliers(df)
+
+    # Verify that exactly two outliers was found and their order_ids
+    assert len(result) == 2
+    assert sorted(result["order_id"].tolist()) == [101, 107]
+
+
+def test_calculate_units_revenue_correlation():
+# Create sample order data with IDs and revenue
+    df = pd.DataFrame({
+        "units":[5, 10, 4, 2, 5],
+        "revenue":[100, 200, 400, 500, 300]
+    })
+    result = calculate_units_revenue_correlation(df)
+    
+    df_zero = pd.DataFrame({
+        "units":[3, 1, 2],
+        "revenue":[100, 100, 200]
+    })
+    result_zero = calculate_units_revenue_correlation(df_zero)
+
+    # testing correlation when all units values are equal
+    # Create sample order data with IDs and revenue
+    df_const = pd.DataFrame({
+        "units":[10, 10, 10, 10],
+        "revenue":[100, 200, 400, 500]
+    })
+    result_const = calculate_units_revenue_correlation(df_const)
+
+    # testing correlation with an empty DataFrame
+    df_empty = pd. DataFrame(columns=["units", "revenue"])
+
+    result_empty = calculate_units_revenue_correlation(df_empty)
+    assert round(result, 3) == -0.643
+    assert round(result_zero, 3) == 0.0
+    assert pd.isna(result_const)
+    assert pd.isna(result_empty)
