@@ -30,6 +30,7 @@ ENV/
 .coverage.*
 htmlcov/
 coverage.xml
+pyrightconfig.json
 
 # Build artifacts
 build/
