@@ -50,10 +50,11 @@ class CommerceAnalyzer:
         return metrics.revenue_top_3_categories(self.dataframe)
 
 
-    def order_value_distribution(self) -> dict[str, float]:
+    def order_value_distribution(self) -> OrderValueDistributionData:
         result = metrics.calculate_order_value_distribution(self.dataframe)
 
         return {key: float(value) for key, value in result.items()}
 
-    def revenue_by_city(self) -> DataFrame: 
+
+    def revenue_by_city(self) -> DataFrame:
         return metrics.revenue_by_city(self.dataframe)
