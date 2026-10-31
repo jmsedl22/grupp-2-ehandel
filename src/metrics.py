@@ -1,5 +1,6 @@
 
 import pandas as pd
+import numpy as np
 
 
 # Calculate the average order value (AOV)
@@ -16,7 +17,7 @@ def calculate_aov(df: pd.DataFrame)  -> float:
     aov = total_revenue / total_orders 
 
     # Return the average revenue per order
-    return aov
+    return float(aov)
 
 # Count unique orders
 def count_orders(df: pd.DataFrame) -> int:
@@ -24,7 +25,7 @@ def count_orders(df: pd.DataFrame) -> int:
     count_orders = df["order_id"].nunique()      
     
     # Return the number of  unique orders
-    return count_orders  
+    return int(count_orders)  
 
 
 # Calculate total revenue 
@@ -35,14 +36,28 @@ def calculate_total_revenue(df: pd.DataFrame) -> float:
     # Return total revenue as a float
     return float(total_revenue)
 
-
 # Calculate total number of units sold
 def calculate_total_units(df: pd.DataFrame) -> int:
-    # Sum all units sold   
-    total_units = sum(df["units"])       
+    # Check for missing values
+    if df["units"].isna().any():
+        raise ValueError("Units cannot contain missing value") 
 
+    # Covert units to numeric values
+    try: 
+        units = pd.to_numeric(df["units"], errors="raise")
+
+    except (ValueError, TypeError) as exc:
+        raise ValueError("Units must contain numeric values") from exc
+
+    # Check for non-finity and fractional values
+    if not np.isfinite(units).all():
+        raise ValueError("Units must cotain finite values")
+    if not (units % 1 == 0).all():
+        raise ValueError ("Units must cotain whole number")           
+
+    total_units = int(units.sum())
     # Return the total number of units sold
-    return total_units
+    return int(total_units)
 
 
 # Combine the results of the two previous functions
@@ -53,7 +68,7 @@ def calculate_total_revenue_units(df: pd.DataFrame) -> tuple[float, int]:
 
 
 # Group revenue by a selected column
-def group_revenue(df: pd.DataFrame, group_by: str) -> pd.DataFrame: 
+def group_revenue(df: pd.DataFrame, group_by: str | pd.Grouper ) -> pd.DataFrame: 
 
     # Calculate total revenue for each group
     group = df.groupby(group_by, as_index= False)["revenue"].sum()   
@@ -140,8 +155,8 @@ def calculate_order_value_distribution(df: pd.DataFrame) -> dict[str, float]:
 
     # return the calculate revenue statistics
     return {
-        "min_revenue": min_revenue,
-        "max_revenue" : max_revenue,
+        "min_revenue": float(min_revenue),
+        "max_revenue" : float(max_revenue),
         "median_revenue" : float(median_revenue),
     }
 
@@ -253,3 +268,80 @@ def _calculate_order_boundaries(df: pd.DataFrame) -> list[float]:
 
     return sorted({float(value) for value in boundaries})
 
+
+# Calculate mode, quartiles and IRQ of order values
+def calulate_descriptive_statistics(df:pd.DataFrame) -> dict[str, list[float] | float]: 
+    orders = group_revenue(df, "order_id")
+    values = orders["revenue"]
+    
+    if values.empty:
+        return {}
+    
+    mode = values.mode().tolist()
+    q1 = values.quantile(0.25)
+    q3 = values.quantile(0.75)
+    iqr = q3 - q1
+    
+    return {
+        "mode":[float(value) for value in mode],
+        "q1": float(q1),
+        "q3": float(q3),
+        "iqr": float(iqr),
+    }
+
+
+# Detect outliners in order values using the IQR methot
+def detect_outliers(df: pd.DataFrame) -> pd.DataFrame:
+    
+    orders = group_revenue(df, "order_id")
+    stats = calulate_descriptive_statistics(df)
+        
+    if not stats:
+        return orders
+
+    # Get quartiles and IQR from the stasistics dictionary    
+    q1 = stats["q1"]
+    q3 = stats["q3"]
+    iqr = stats["iqr"]
+
+    # Calculate lower and upper outlier boundalies
+    lower_bound = q1 - 1.5 * iqr
+    upper_bound = q3 + 1.5 * iqr
+
+    # Select orders outside the boundaries   
+    outliers = orders[
+        (orders["revenue"] < lower_bound) | (orders["revenue"] > upper_bound)
+    ]
+
+    return outliers
+
+def calculate_order_z_scores(df: pd.DataFrame) -> pd.DataFrame:
+    orders = group_revenue(df, "order_id")
+
+    # Get order revenue values
+    values = orders["revenue"]
+
+    if values.empty:
+        orders["z_score"] = pd.Serie(dtypy=float)
+        return orders
+        
+    
+    mean = calculate_aov(df)
+    std = calculate_order_value_std(df)
+
+    # Handle zero standard deviation
+    if pd.isna(std) or std == 0:
+        orders["z_score"] = 0.0
+        return orders
+
+    # Calculate z-score for each order
+    orders["z_score"] = (values - mean) / std
+
+    return orders
+
+
+# Calculate the linear between units sold and revenue
+def calculate_units_revenue_correlation(df: pd.DatFrame) -> float:
+    correlation = df["units"].corr(df["revenue"])
+
+    return float(correlation)
