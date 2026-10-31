@@ -1,5 +1,6 @@
 
 import pandas as pd
+import numpy as np
 
 
 # Calculate the average order value (AOV)
@@ -16,7 +17,7 @@ def calculate_aov(df: pd.DataFrame)  -> float:
     aov = total_revenue / total_orders 
 
     # Return the average revenue per order
-    return aov
+    return float(aov)
 
 # Count unique orders
 def count_orders(df: pd.DataFrame) -> int:
@@ -24,7 +25,7 @@ def count_orders(df: pd.DataFrame) -> int:
     count_orders = df["order_id"].nunique()      
     
     # Return the number of  unique orders
-    return count_orders  
+    return int(count_orders)  
 
 
 # Calculate total revenue 
@@ -35,14 +36,28 @@ def calculate_total_revenue(df: pd.DataFrame) -> float:
     # Return total revenue as a float
     return float(total_revenue)
 
-
 # Calculate total number of units sold
 def calculate_total_units(df: pd.DataFrame) -> int:
-    # Sum all units sold   
-    total_units = sum(df["units"])       
+    # Check for missing values
+    if df["units"].isna().any():
+        raise ValueError("Units cannot contain missing value") 
 
+    # Covert units to numeric values
+    try: 
+        units = pd.to_numeric(df["units"], errors="raise")
+
+    except (ValueError, TypeError) as exc:
+        raise ValueError("Units must contain numeric values") from exc
+
+    # Check for non-finity and fractional values
+    if not np.isfinite(units).all():
+        raise ValueError("Units must cotain finite values")
+    if not (units % 1 == 0).all():
+        raise ValueError ("Units must cotain whole number")           
+
+    total_units = int(units.sum())
     # Return the total number of units sold
-    return total_units
+    return int(total_units)
 
 
 # Combine the results of the two previous functions
@@ -53,7 +68,7 @@ def calculate_total_revenue_units(df: pd.DataFrame) -> tuple[float, int]:
 
 
 # Group revenue by a selected column
-def group_revenue(df: pd.DataFrame, group_by: str) -> pd.DataFrame: 
+def group_revenue(df: pd.DataFrame, group_by: str | pd.Grouper ) -> pd.DataFrame: 
 
     # Calculate total revenue for each group
     group = df.groupby(group_by, as_index= False)["revenue"].sum()   
@@ -140,8 +155,8 @@ def calculate_order_value_distribution(df: pd.DataFrame) -> dict[str, float]:
 
     # return the calculate revenue statistics
     return {
-        "min_revenue": min_revenue,
-        "max_revenue" : max_revenue,
+        "min_revenue": float(min_revenue),
+        "max_revenue" : float(max_revenue),
         "median_revenue" : float(median_revenue),
     }
 
@@ -329,4 +344,4 @@ def calculate_order_z_scores(df: pd.DataFrame) -> pd.DataFrame:
 def calculate_units_revenue_correlation(df: pd.DatFrame) -> float:
     correlation = df["units"].corr(df["revenue"])
 
-    return correlation
+    return float(correlation)
