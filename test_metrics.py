@@ -1,6 +1,6 @@
 
 import pandas as pd
-
+import pytest
 from src.metrics import (
     calculate_aov,
     calculate_order_ranges,
@@ -290,7 +290,26 @@ def test_calculate_total_units():
 
     # Verify the expected total number of units
     assert result == 13
+    assert type(result) is int
 
+
+def test_calculate_total_units_missing_values():
+    for value in [None, float("nan")]:
+        df = pd.DataFrame( {"units": [4, value, 2]})
+
+        with pytest.raises(ValueError):
+            calculate_total_units(df)
+
+
+# Test infinite and fractional values
+def test_calculate_total_units_invalid_values():
+     for value in [float("inf"), float("-inf"), 2.5]:
+          df = pd.DataFrame({"units": [4, value ,2]})
+
+          with pytest.raises(ValueError):
+               calculate_total_units(df)
+
+     
 def test_calulate_descriptive_statistics():
     # Create sample order data with IDs and revenue
     df = pd.DataFrame({
