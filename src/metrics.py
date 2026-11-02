@@ -253,3 +253,80 @@ def _calculate_order_boundaries(df: pd.DataFrame) -> list[float]:
 
     return sorted({float(value) for value in boundaries})
 
+
+# Calculate mode, quartiles and IRQ of order values
+def calulate_descriptive_statistics(df:pd.DataFrame) -> dict: 
+    orders = group_revenue(df, "order_id")
+    values = orders["revenue"]
+    
+    if values.empty:
+        return {}
+    
+    mode = values.mode().tolist()
+    q1 = values.quantile(0.25)
+    q3 = values.quantile(0.75)
+    iqr = q3 - q1
+    
+    return {
+        "mode": mode,
+        "q1": q1,
+        "q3": q3,
+        "iqr": iqr
+    }
+
+
+# Detect outliners in order values using the IQR methot
+def detect_outliers(df: pd.DataFrame) -> pd.DataFrame:
+    
+    orders = group_revenue(df, "order_id")
+    stats = calulate_descriptive_statistics(df)
+        
+    if not stats:
+        return orders
+
+    # Get quartiles and IQR from the stasistics dictionary    
+    q1 = stats["q1"]
+    q3 = stats["q3"]
+    iqr = stats["iqr"]
+
+    # Calculate lower and upper outlier boundalies
+    lower_bound = q1 - 1.5 * iqr
+    upper_bound = q3 + 1.5 * iqr
+
+    # Select orders outside the boundaries   
+    outliers = orders[
+        (orders["revenue"] < lower_bound) | (orders["revenue"] > upper_bound)
+    ]
+
+    return outliers
+
+def calculate_order_z_scores(df: pd.DataFrame) -> pd.DataFrame:
+    orders = group_revenue(df, "order_id")
+
+    # Get order revenue values
+    values = orders["revenue"]
+
+    if values.empty:
+        orders["z_score"] = pd.Serie(dtypy=float)
+        return orders
+        
+    
+    mean = calculate_aov(df)
+    std = calculate_order_value_std(df)
+
+    # Handle zero standard deviation
+    if pd.isna(std) or std == 0:
+        orders["z_score"] = 0.0
+        return orders
+
+    # Calculate z-score for each order
+    orders["z_score"] = (values - mean) / std
+
+    return orders
+
+
+# Calculate the linear between units sold and revenue
+def calculate_units_revenue_correlation(df: pd.DatFrame) -> float:
+    correlation = df["units"].corr(df["revenue"])
+
+    return correlation
