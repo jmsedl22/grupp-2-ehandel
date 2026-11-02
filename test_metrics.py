@@ -322,10 +322,7 @@ def test_calculate_total_units_invalid_values():
           with pytest.raises(ValueError):
                calculate_total_units(df)
 
-     
-    # Verify the expected total number of units
-    assert result == 13
-
+   
 def test_calulate_descriptive_statistics():
     # Create sample order data with IDs and revenue
     df = pd.DataFrame({
