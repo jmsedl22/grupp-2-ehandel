@@ -1,21 +1,18 @@
 # Group 2 E-commerce analysis report
 Group assignment for a course in Python programming. The project aims to build an e-commerce report in a Jupyter Notebook, given sample data from a CSV file.
 
-### Setup and execution
-- Python 3 and Git are installed.
-- The required Python version has not yet been decided.
+## Quick start
+Requires Python 3 (tested with 3.14.7). From the repository root in Windows PowerShell, run:
 
-From the repository root, run 
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m jupyterlab notebook/ecommerce_sales.ipynb
 ```
-python -m venv
-```
-to create a virtual environment.
 
-With the virtual environment activated, install JupyterLab by running
-```
-python -m pip install jupyterlab
-```
-Additional dependencies will be documented when necessary. 
+Select the Python 3 kernel and choose **Run → Run All Cells**.
+
+On macOS/Linux, replace `.\.venv\Scripts\python.exe` with `.venv/bin/python` (unverified).
 
 ## Goals
 As per the assignment, the analysis part of this assignment aims to answer:
@@ -25,38 +22,6 @@ As per the assignment, the analysis part of this assignment aims to answer:
 4. What does a typical order look like? (Average order value and spread.)
 5. Top lists (Top 3 categories based on revenue.)
 6. Deviations (Other patterns that stand out.) 
-
-## Setting up the project
-
-### Dependencies
-- Python version 3.14.17
-- Git
-
-Older Python versions or operating systems other than Windows 11 have not been verified.
-
-### 1. Creating a virtual environment
-```sh
-python -m venv .venv
-```
-### 2. Activating the virtual environment
-Using Windows PowerShell:
-```sh
-.\.venv\Scripts\Activate.ps1
-```
-On macOS or Linux:
-```sh
-source .venv/bin/activate
-```
-
-### 3. Installing dependencies
-```sh
-python -m pip install -r requirements.txt
-```
-
-### 4. Opening the notebook
-```sh
-python -m jupyterlab
-```
 
 ## Workflow
 Our agreed-upon workflow is as follows:
@@ -80,7 +45,30 @@ Our agreed-upon workflow is as follows:
 10. Merge the pull request when it is approved.
 
 ## Responsibilities
-Individual responsibilities will be documented as they are decided. 
+Responsibilities are divided by file, but subject to change as work progresses.
+- Charlie - io_utils.py
+- Katerina - metrics.py
+- Natasa - viz.py
+- Jacob - ecommerce_sales.ipynb, README.md (documentation), and final check
+
+## Architecture
+`CommerceAnalyzer` in `src/ecommerce.py` is a single interface to the notebook
+for data loading, reusable calculations and chart generation.
+
+- `io_utils.py` handles data loading.
+- `metrics.py` implements calculations.
+- `viz.py` implements charts.
+- `CommerceAnalyzer` holds the dataset and coordinates calls to these modules.
+- The notebook formats and displays returned tables and contains the written analysis.
+
+```mermaid
+flowchart TD
+    N("Notebook report file") -->|CommerceAnalyzer| E("ecommerce.py")
+    
+    E -->|Key indicators| M("metrics.py")
+    E -->|Diagrams| V("viz.py")
+    E -->|Data loading| IO("io_utils.py")
+```
 
 ## Project structure
 The project structure follows the proposed template given in the assignment description. 
@@ -89,13 +77,26 @@ grupp-2-ehandel/
 ├── data/
 │   └── ecommerce_sales.csv   # Input dataset for the analysis
 ├── notebook/
-│   └── ecommerce_sales.ipynb # Main analysis notebook (planned)
+│   └── ecommerce_sales.ipynb # Main analysis notebook
 ├── src/
-│   ├── ecommerce.py          # E-commerce analysis logic (planned)
-│   ├── io_utils.py           # Data loading and file handling (planned)
-│   ├── metrics.py            # Sales metric calculations (planned)
-│   └── viz.py                # Charts and visualizations (planned)
+│   ├── ecommerce.py          # E-commerce analysis, notebook interface
+│   ├── io_utils.py           # Data loading, file handling
+│   ├── metrics.py            # Sales metric calculations
+│   └── viz.py                # Charts, visualizations
 ├── .gitignore
 └── README.md
 ```
-Reusable, generic Python code is found in `src/`, while the notebook contains goal-specific analysis and visualizations.
+
+## Architecture
+The ecommerce.py file contains a class CommerceAnalyzer, that acts as an interface and coordinator to the notebook. It then assists in presenting the results in the report.
+```mermaid
+flowchart TD
+    N("Notebook report file") -->|CommerceAnalyzer| E("ecommerce.py")
+    
+    E -->|Key indicators| M("metrics.py")
+    E -->|Diagrams| V("viz.py")
+    E -->|Data loading| IO("io_utils.py")
+```
+Reusable calculations and chart implementations belong in `src/`.
+The notebook accesses them through `CommerceAnalyzer` and handles table
+presentation and written analysis.
