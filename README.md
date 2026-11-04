@@ -23,7 +23,6 @@ As per the assignment, the analysis part of this assignment aims to answer:
 5. Top lists (Top 3 categories based on revenue.)
 6. Deviations (Other patterns that stand out.) 
 
-
 ## Workflow
 Our agreed-upon workflow is as follows:
 
@@ -46,12 +45,29 @@ Our agreed-upon workflow is as follows:
 10. Merge the pull request when it is approved.
 
 ## Responsibilities
-Responsibilities are divided by file: 
+Responsibilities are divided by file, but subject to change as work progresses.
 - Charlie - io_utils.py
 - Katerina - metrics.py
 - Natasa - viz.py
-- (Empty) - ecommerce_sales.ipynb
-- Jacob - README.md (documentation), and final check 
+- Jacob - ecommerce_sales.ipynb, README.md (documentation), and final check
+
+## Project structure
+The project structure follows the proposed template given in the assignment description. 
+```
+grupp-2-ehandel/
+├── data/
+│   └── ecommerce_sales.csv   # Input dataset for the analysis
+├── notebook/
+│   └── ecommerce_sales.ipynb # Main analysis notebook
+├── src/
+│   ├── ecommerce.py          # E-commerce analysis, notebook interface
+│   ├── io_utils.py           # Data loading, file handling
+│   ├── metrics.py            # Sales metric calculations
+│   └── viz.py                # Charts, visualizations
+├── .gitignore
+└── README.md
+```
+Reusable, generic Python code is found in `src/`, while the notebook contains goal-specific analysis and visualizations.
 
 ## Architecture
 The ecommerce.py file contains a class CommerceAnalyzer, that acts as an interface and coordinator to the notebook. It then assists in presenting the results in the report.
@@ -64,21 +80,3 @@ flowchart TD
     E -->|Diagrams| V("viz.py")
     E -->|Data loading| IO("io_utils.py")
 ```
-
-## Project structure
-The project structure follows the proposed template given in the assignment description. 
-```
-grupp-2-ehandel/
-├── data/
-│   └── ecommerce_sales.csv   # Input dataset for the analysis
-├── notebook/
-│   └── ecommerce_sales.ipynb # Main analysis notebook (planned)
-├── src/
-│   ├── ecommerce.py          # E-commerce analysis logic (planned)
-│   ├── io_utils.py           # Data loading and file handling (planned)
-│   ├── metrics.py            # Sales metric calculations (planned)
-│   └── viz.py                # Charts and visualizations (planned)
-├── .gitignore
-└── README.md
-```
-Reusable, generic Python code is found in `src/`, while the notebook contains goal-specific analysis and visualizations.
