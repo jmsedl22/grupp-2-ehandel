@@ -322,7 +322,7 @@ def calculate_order_z_scores(df: pd.DataFrame) -> pd.DataFrame:
     values = orders["revenue"]
 
     if values.empty:
-        orders["z_score"] = pd.Serie(dtypy=float)
+        orders["z_score"] = pd.Series(dtype=float)
         return orders
         
     
@@ -341,7 +341,7 @@ def calculate_order_z_scores(df: pd.DataFrame) -> pd.DataFrame:
 
 
 # Calculate the linear between units sold and revenue
-def calculate_units_revenue_correlation(df: pd.DatFrame) -> float:
+def calculate_units_revenue_correlation(df: pd.DataFrame) -> float:
     correlation = df["units"].corr(df["revenue"])
 
     return float(correlation)

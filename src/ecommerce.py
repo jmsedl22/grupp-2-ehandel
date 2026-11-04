@@ -3,15 +3,9 @@ from typing import TypedDict
 
 from pandas import DataFrame
 
-from io_utils import load_data
-import metrics
+from .io_utils import load_data
+from . import metrics
 
-from metrics import (
-    calculate_total_revenue,
-    calculate_total_units,
-    count_orders,
-    calculate_aov,
-)
 
 # Return type of the Summery() function as a typed dictionary
 class SummaryData(TypedDict):
@@ -41,10 +35,10 @@ class CommerceAnalyzer:
 
     def summary(self) -> SummaryData:
         return {
-            "total_revenue": calculate_total_revenue(self.dataframe),
-            "total_units": calculate_total_units(self.dataframe),
-            "order_count": count_orders(self.dataframe),
-            "aov": calculate_aov(self.dataframe),
+            "total_revenue": metrics.calculate_total_revenue(self.dataframe),
+            "total_units": metrics.calculate_total_units(self.dataframe),
+            "order_count": metrics.count_orders(self.dataframe),
+            "aov": metrics.calculate_aov(self.dataframe),
         }
 
     def revenue_by_category(self) -> DataFrame:
@@ -59,10 +53,11 @@ class CommerceAnalyzer:
         return metrics.revenue_top_3_categories(self.dataframe)
 
 
-    def order_value_distribution(self) -> dict[str, float]:
+    def order_value_distribution(self) -> OrderValueDistributionData:
         result = metrics.calculate_order_value_distribution(self.dataframe)
 
         return {key: float(value) for key, value in result.items()}
 
-    def revenue_by_city(self) -> DataFrame: 
+
+    def revenue_by_city(self) -> DataFrame:
         return metrics.revenue_by_city(self.dataframe)
