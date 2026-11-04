@@ -88,7 +88,14 @@ Responsibilities are divided by file:
 - Jacob - README.md (documentation), and final check 
 
 ## Architecture
-The ecommerce.py file contains a class CommerceAnalyzer, that acts as an interface and coordinator to the notebook. It then assists in presenting the results in the report.
+`CommerceAnalyzer` in `src/ecommerce.py` is a single interface to the notebook
+for data loading, reusable calculations and chart generation.
+
+- `io_utils.py` handles data loading.
+- `metrics.py` implements calculations.
+- `viz.py` implements charts.
+- `CommerceAnalyzer` holds the dataset and coordinates calls to these modules.
+- The notebook formats and displays returned tables and contains the written analysis.
 
 ```mermaid
 flowchart TD
@@ -115,4 +122,6 @@ grupp-2-ehandel/
 ├── .gitignore
 └── README.md
 ```
-Reusable, generic Python code is found in `src/`, while the notebook contains goal-specific analysis and visualizations.
+Reusable calculations and chart implementations belong in `src/`.
+The notebook accesses them through `CommerceAnalyzer` and handles table
+presentation and written analysis.
