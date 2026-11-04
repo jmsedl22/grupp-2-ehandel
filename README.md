@@ -51,6 +51,25 @@ Responsibilities are divided by file, but subject to change as work progresses.
 - Natasa - viz.py
 - Jacob - ecommerce_sales.ipynb, README.md (documentation), and final check
 
+## Architecture
+`CommerceAnalyzer` in `src/ecommerce.py` is a single interface to the notebook
+for data loading, reusable calculations and chart generation.
+
+- `io_utils.py` handles data loading.
+- `metrics.py` implements calculations.
+- `viz.py` implements charts.
+- `CommerceAnalyzer` holds the dataset and coordinates calls to these modules.
+- The notebook formats and displays returned tables and contains the written analysis.
+
+```mermaid
+flowchart TD
+    N("Notebook report file") -->|CommerceAnalyzer| E("ecommerce.py")
+    
+    E -->|Key indicators| M("metrics.py")
+    E -->|Diagrams| V("viz.py")
+    E -->|Data loading| IO("io_utils.py")
+```
+
 ## Project structure
 The project structure follows the proposed template given in the assignment description. 
 ```
@@ -67,11 +86,9 @@ grupp-2-ehandel/
 ├── .gitignore
 └── README.md
 ```
-Reusable, generic Python code is found in `src/`, while the notebook contains goal-specific analysis and visualizations.
 
 ## Architecture
 The ecommerce.py file contains a class CommerceAnalyzer, that acts as an interface and coordinator to the notebook. It then assists in presenting the results in the report.
-
 ```mermaid
 flowchart TD
     N("Notebook report file") -->|CommerceAnalyzer| E("ecommerce.py")
@@ -80,3 +97,6 @@ flowchart TD
     E -->|Diagrams| V("viz.py")
     E -->|Data loading| IO("io_utils.py")
 ```
+Reusable calculations and chart implementations belong in `src/`.
+The notebook accesses them through `CommerceAnalyzer` and handles table
+presentation and written analysis.
