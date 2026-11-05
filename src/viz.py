@@ -1,5 +1,7 @@
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
+import pandas as pd
+from .metrics import revenue_by_month
 
 # Create charts showing total revenue per category and city
 
@@ -50,30 +52,43 @@ def plot_revenue_category_city(result_1, result_2):
     plt.show()
 
 
-# Create a chart showing monthly revenue
+# Create a chart showing monthly revenue by category
 
-# Function for creating a line chart showing monthly revenue
-def plot_monthly_revenue(result):
+# Function for creating a multi-line chart showing monthly revenue by category
+def plot_monthly_revenue(df: pd.DataFrame) -> None:
 
     # Create figure and axis
-    fig, ax = plt.subplots(figsize=(8, 5), constrained_layout=True)
+    fig, ax = plt.subplots(figsize=(10, 6), constrained_layout=True)
 
-    # Set the data for x- and y-axis
-    x = result["date"]
-    y = result["revenue"]
+    # Create a separate line for each category
+    for category in df["category"].unique():
 
-    # Create a line chart
-    ax.plot(x, y, marker="o", color="seagreen", linewidth=2, markeredgecolor="white", markersize=8)
+        # Filter data for the selected category
+        category_data = df[df["category"] == category]
+
+        # Calculate monthly revenue
+        monthly_data = revenue_by_month(category_data)
+
+        # Create a multi-line chart
+        ax.plot(
+            monthly_data["date"],
+            monthly_data["revenue"],
+            marker="o",
+            linewidth=2,
+            markersize=8,
+            label=category
+        )
 
     # Format y-axis
     ax.yaxis.set_major_formatter(ticker.EngFormatter(unit=""))
-    ax.set_ylim(450_000, 700_000)
-    ax.get_yticklabels()[0].set_visible(False)
 
     # Add a title and axis labels and format them
-    ax.set_title("Intäkt per månad", fontsize=16, fontweight= "bold", pad=20)
+    ax.set_title("Intäkt per månad och kategori", fontsize=16, fontweight= "bold", pad=20)
     ax.set_xlabel("Månad", fontsize=14, labelpad=20)
     ax.set_ylabel("Intäkt [SEK]", fontsize=14, labelpad=20)
+
+    # Add legend
+    ax.legend(title="Kategori")
 
     # Add horizontal gridlines
     ax.grid(True, axis="y", linewidth=0.3)
@@ -83,14 +98,15 @@ def plot_monthly_revenue(result):
 
 
 # Create a chart showing order value distribution
+from .metrics import calculate_order_ranges
 
 # Function for creating a bar chart for order value distribution
-def plot_order_value_distribution(result):
+def plot_order_value_distribution(df: pd.DataFrame) -> None:
 
     # Select data for the chart
-    number_of_orders = result["number of orders"].to_list()
-    percentages = result["percentages"].to_list()
-    labels = result.index.to_list()
+    number_of_orders = df["number of orders"].to_list()
+    percentages = df["percentages"].to_list()
+    labels = df.index.to_list()
 
     # Create figure and axis
     fig, ax = plt.subplots(figsize=(8, 5), constrained_layout=True)
