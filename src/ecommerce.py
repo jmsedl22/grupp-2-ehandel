@@ -65,3 +65,7 @@ class CommerceAnalyzer:
 
     def plot_monthly_revenue(self) -> None:
         viz.plot_monthly_revenue(self.dataframe)
+
+    def plot_order_value_distribution(self) -> None:
+        order_ranges_df = self.order_ranges()
+        viz.plot_order_value_distribution(order_ranges_df)

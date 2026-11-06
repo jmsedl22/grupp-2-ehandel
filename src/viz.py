@@ -102,3 +102,5 @@ def plot_order_value_distribution(df: pd.DataFrame) -> None:
     ax.set_axisbelow(True)
 
     plt.show()
+
+
