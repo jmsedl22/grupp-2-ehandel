@@ -55,7 +55,11 @@ class CommerceAnalyzer:
     def order_value_distribution(self) -> OrderValueDistributionData:
         result = metrics.calculate_order_value_distribution(self.dataframe)
 
-        return {key: float(value) for key, value in result.items()}
+        return {
+            "min_revenue": result["min_revenue"],
+            "median_revenue": result["median_revenue"],
+            "max_revenue": result["max_revenue"]
+        }
 
     def order_ranges(self) -> DataFrame:
         return metrics.calculate_order_ranges(self.dataframe)
