@@ -62,11 +62,13 @@ class CommerceAnalyzer:
     def revenue_by_city(self) -> DataFrame:
         return metrics.revenue_by_city(self.dataframe)
 
-    def plot_revenue_category_city(self) -> None:
+    def plot_revenue_category(self) -> None:
         category_revenue = self.revenue_by_category()
-        city_revenue = self.revenue_by_city()
+        viz.plot_revenue_category(category_revenue)
 
-        viz.plot_revenue_category_city(category_revenue, city_revenue)
+    def plot_revenue_city(self) -> None:
+        city_revenue = self.revenue_by_city()
+        viz.plot_revenue_city(city_revenue)
         
     def plot_monthly_revenue(self) -> None:
         viz.plot_monthly_revenue(self.dataframe)
