@@ -27,7 +27,6 @@ class CommerceAnalyzer:
     file_path: str | Path
     dataframe: DataFrame
 
-
     def __init__(self, file_path: str | Path) -> None:
         self.file_path = file_path
         self.dataframe = io_utils.load_data(self.file_path)
@@ -43,18 +42,14 @@ class CommerceAnalyzer:
     def revenue_by_category(self) -> DataFrame:
         return metrics.revenue_by_category(self.dataframe)
 
-
     def revenue_by_month(self) -> DataFrame:
         return metrics.revenue_by_month(self.dataframe)
-
 
     def revenue_top_3_categories(self) -> DataFrame:
         return metrics.revenue_top_3_categories(self.dataframe)
 
-
     def order_value_distribution(self) -> OrderValueDistributionData:
         result = metrics.calculate_order_value_distribution(self.dataframe)
-
         return {
             "min_revenue": result["min_revenue"],
             "median_revenue": result["median_revenue"],
