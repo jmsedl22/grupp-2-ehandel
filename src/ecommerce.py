@@ -72,3 +72,6 @@ class CommerceAnalyzer:
 
     def plot_revenue_distribution_city(self) -> None:
         viz.plot_revenue_distribution_city(self.dataframe)
+
+    def plot_revenue_distribution_category(self) -> None:
+        viz.plot_revenue_distribution_category(self.dataframe)
