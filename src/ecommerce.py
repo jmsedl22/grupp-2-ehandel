@@ -5,6 +5,7 @@ from pandas import DataFrame
 
 from .io_utils import load_data
 from . import metrics
+from . import viz
 
 
 # Return type of the Summery() function as a typed dictionary
@@ -63,3 +64,6 @@ class CommerceAnalyzer:
 
     def revenue_by_city(self) -> DataFrame:
         return metrics.revenue_by_city(self.dataframe)
+
+    def plot_monthly_revenue(self) -> None:
+        viz.plot_monthly_revenue(self.dataframe)
