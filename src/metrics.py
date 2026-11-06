@@ -345,3 +345,18 @@ def calculate_units_revenue_correlation(df: pd.DataFrame) -> float:
     correlation = df["units"].corr(df["revenue"])
 
     return float(correlation)
+
+
+# Calculate orders value, units per order, and summary statics
+def calculate_typical_order_data(df:pd.DataFrame) -> pd.DataFrame:
+    orders =df.groupby("order_id").agg(order_revenue=("revenue", "sum"),
+    order_units=("units", "sum")).reset_index()
+    
+
+    orders["median_revenue"] = calculate_order_value_distribution(df)["median_revenue"]
+    orders["median_units"] = orders["order_units"].median()
+    orders["average_revenue"] = calculate_aov(df)
+    orders["average_units"] = calculate_total_units(df)/count_orders(df)
+    unit_counts = (orders.groupby("order_units").size().reset_index(name="order_count"))
+    
+    return orders, unit_counts
