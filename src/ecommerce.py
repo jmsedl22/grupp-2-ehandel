@@ -3,8 +3,7 @@ from typing import TypedDict
 
 from pandas import DataFrame
 
-from .io_utils import load_data
-from . import metrics
+from . import io_utils, metrics, viz
 
 
 # Return type of the Summery() function as a typed dictionary
@@ -31,7 +30,7 @@ class CommerceAnalyzer:
 
     def __init__(self, file_path: str | Path) -> None:
         self.file_path = file_path
-        self.dataframe = load_data(self.file_path)
+        self.dataframe = io_utils.load_data(self.file_path)
 
     def summary(self) -> SummaryData:
         return {
@@ -45,11 +44,11 @@ class CommerceAnalyzer:
         return metrics.revenue_by_category(self.dataframe)
 
 
-    def revenue_by_month(self) -> DataFrame:  
+    def revenue_by_month(self) -> DataFrame:
         return metrics.revenue_by_month(self.dataframe)
 
 
-    def revenue_top_3_categories(self) -> DataFrame:  
+    def revenue_top_3_categories(self) -> DataFrame:
         return metrics.revenue_top_3_categories(self.dataframe)
 
 
@@ -63,3 +62,9 @@ class CommerceAnalyzer:
 
     def revenue_by_city(self) -> DataFrame:
         return metrics.revenue_by_city(self.dataframe)
+
+    def plot_revenue_category_city(self) -> None:
+        category_revenue = self.revenue_by_category()
+        city_revenue = self.revenue_by_city()
+
+        viz.plot_revenue_category_city(category_revenue, city_revenue)
