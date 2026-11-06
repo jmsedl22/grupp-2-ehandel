@@ -1,39 +1,40 @@
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import pandas as pd
-from .metrics import revenue_by_month, calculate_order_ranges
+from .metrics import revenue_by_month
 
-def plot_revenue_category_city(result_1, result_2):
+def plot_revenue_category(category_revenue) -> None:
     """
-    Creates bar charts for total revenue by product category and city
+    Creates a bar chart for total revenue by product category
     """
+    fig, ax = plt.subplots(figsize=(8, 5), constrained_layout=True)
 
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 8), sharex=True)
+    ax.barh(category_revenue["category"], category_revenue["revenue"] ,color="turquoise")
+    ax.set_title("Intäkt per kategori", fontsize=16, fontweight= "bold", pad=20)
+    ax.set_xlabel("Intäkt [SEK]", fontsize=14, labelpad=20)
+    ax.xaxis.set_major_formatter(ticker.EngFormatter(unit=""))
+    ax.set_ylabel("Kategori", fontsize=14)
+    ax.grid(True, axis="x", linewidth=0.3)
+    ax.invert_yaxis()
+    ax.set_axisbelow(True)
 
-    x1 = result_1["revenue"]
-    y1 = result_1["category"]
+    plt.show()
 
-    x2 = result_2["revenue"]
-    y2 = result_2["city"]
 
-    ax1.barh(y1, x1 ,color="turquoise")
-    ax1.set_title("Intäkt per kategori", fontsize=16, fontweight= "bold", pad=20)
-    ax1.set_ylabel("Kategori", fontsize=14)
-    ax1.grid(True, axis="x", linewidth=0.3)
-    ax1.invert_yaxis()
-    ax1.set_axisbelow(True)
+def plot_revenue_city(city_revenue) -> None:
+    """
+    Creates a bar chart for total revenue by city
+    """
+    fig, ax = plt.subplots(figsize=(8, 5), constrained_layout=True)
 
-    ax2.barh(y2, x2, color="lightgreen")
-    ax2.set_title("Intäkt per stad", fontsize=16, fontweight= "bold", pad=20)
-    ax2.set_xlabel("Intäkt [SEK]", fontsize=14, labelpad=20)
-    ax2.set_ylabel("Stad", fontsize=14)
-    ax2.xaxis.set_major_formatter(ticker.EngFormatter(unit=""))
-    ax2.grid(True, axis="x", linewidth=0.3)
-    ax2.invert_yaxis()
-    ax2.set_axisbelow(True)
-
-    plt.tight_layout()
-    plt.subplots_adjust(hspace=0.3)
+    ax.barh(city_revenue["city"], city_revenue["revenue"], color="lightgreen")
+    ax.set_title("Intäkt per stad", fontsize=16, fontweight= "bold", pad=20)
+    ax.set_xlabel("Intäkt [SEK]", fontsize=14, labelpad=20)
+    ax.xaxis.set_major_formatter(ticker.EngFormatter(unit=""))
+    ax.set_ylabel("Stad", fontsize=14)
+    ax.grid(True, axis="x", linewidth=0.3)
+    ax.invert_yaxis()
+    ax.set_axisbelow(True)
 
     plt.show()
 
@@ -42,8 +43,7 @@ def plot_monthly_revenue(df: pd.DataFrame) -> None:
     """
     Creates a multi-line chart for monthly revenue by category
     """
-
-    fig, ax = plt.subplots(figsize=(10, 6), constrained_layout=True)
+    fig, ax = plt.subplots(figsize=(8, 5), constrained_layout=True)
 
     for category in df["category"].unique():
         category_data = df[df["category"] == category]
@@ -62,7 +62,7 @@ def plot_monthly_revenue(df: pd.DataFrame) -> None:
     ax.set_title("Intäkt per månad och kategori", fontsize=16, fontweight= "bold", pad=20)
     ax.set_xlabel("Månad", fontsize=14, labelpad=20)
     ax.set_ylabel("Intäkt [SEK]", fontsize=14, labelpad=20)
-    ax.legend(title="Kategori")
+    ax.legend(title="Kategori", loc="upper right", ncol=3)
     ax.grid(True, axis="y", linewidth=0.3)
 
     plt.show()
@@ -72,7 +72,6 @@ def plot_order_value_distribution(df: pd.DataFrame) -> None:
     """
     Creates a bar chart for order value distribution
     """
-
     number_of_orders = df["number of orders"].to_list()
     percentages = df["percentages"].to_list()
     labels = df.index.to_list()
@@ -108,7 +107,6 @@ def plot_revenue_distribution_city(df: pd.DataFrame) -> None:
     """
     Creates a box plot for revenue distribution by city
     """
-
     revenue_groups = df.groupby("city")["revenue"]
     cities = revenue_groups.median().sort_values(ascending=True).index
     revenue_by_city = [
@@ -140,7 +138,6 @@ def plot_revenue_distribution_category(df: pd.DataFrame) -> None:
     """
     Creates a box plot for revenue distribution by category
     """
-
     revenue_groups = df.groupby("category")["revenue"]
     categories = revenue_groups.median().sort_values(ascending=True).index
     revenue_by_category = [
