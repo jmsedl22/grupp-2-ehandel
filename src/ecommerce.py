@@ -67,3 +67,16 @@ class CommerceAnalyzer:
         city_revenue = self.revenue_by_city()
 
         viz.plot_revenue_category_city(category_revenue, city_revenue)
+        
+    def plot_monthly_revenue(self) -> None:
+        viz.plot_monthly_revenue(self.dataframe)
+
+    def plot_order_value_distribution(self) -> None:
+        order_ranges_df = self.order_ranges()
+        viz.plot_order_value_distribution(order_ranges_df)
+
+    def plot_revenue_distribution_city(self) -> None:
+        viz.plot_revenue_distribution_city(self.dataframe)
+
+    def plot_revenue_distribution_category(self) -> None:
+        viz.plot_revenue_distribution_category(self.dataframe)
