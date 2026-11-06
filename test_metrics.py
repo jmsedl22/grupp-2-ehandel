@@ -1,11 +1,14 @@
-
-import pandas as pd
 import numpy as np
+import pandas as pd
 import pytest
+
 from src.metrics import (
     calculate_aov,
     calculate_order_ranges,
     calculate_order_value_distribution,
+    calculate_order_value_std,
+    calculate_order_value_variance,
+    get_order_range_boundaries,
     calculate_total_revenue,
     calculate_total_revenue_units,
     calculate_total_units,
@@ -24,388 +27,429 @@ from src.metrics import (
 )
 
 
-# Test counting unique orders 
-def test_count_ordes():
-    # Create sample data with duplicate order IDs
-    df = pd.DataFrame({"order_id":[101,102,103,103]})
-
+def test_count_orders():
+    df = pd.DataFrame({"order_id": [101, 102, 103, 103]})
     result = count_orders(df)
-    
-    # Verify that duplicate order IDs are counted only once and return type
-    assert result == 3 
-    assert type(result) is int                                    
+
+    assert result == 3
+    assert type(result) is int
 
 
-# Test calculate total revenue and total units
 def test_calculate_total_revenue_units():
-    # Create sample sales data with revenue and units
     df = pd.DataFrame({
-        "revenue":[200, 300, 700, 900], 
-        "units":[4, 0, 7, 2]
+        "revenue": [200, 300, 700, 900],
+        "units": [4, 0, 7, 2]
     })
 
-    # Calculate total revenue and units
     total_revenue, total_units = calculate_total_revenue_units(df)
 
-    # Verify the expected total revenue and units and return type
     assert total_revenue == 2100
-    assert total_units == 13  
+    assert total_units == 13
     assert type(total_revenue) is float
     assert type(total_units) is int
-    assert type( calculate_total_revenue_units(df)) is tuple                                    
-    
+    assert isinstance(calculate_total_revenue_units(df), tuple)
 
-# Test grouping total revenue by city
+
 def test_group_revenue_by_city():
-    # Create sample sales data
     df = pd.DataFrame({
-        "city":["Stockholm", "Malmö", "Uppsala", "Malmö",  "Uppsala"],
-        "revenue":[100, 200, 300, 400, 100]
+        "city": ["Stockholm", "Malmö", "Uppsala", "Malmö", "Uppsala"],
+        "revenue": [100, 200, 300, 400, 100]
     })
 
-    # Calculate total revenue for each city
-    result = group_revenue(df,"city")
+    result = group_revenue(df, "city")
 
-    # Verify total revenue for each city and descending order and return type
     assert result["revenue"].tolist() == [600, 400, 100]
     assert result["city"].tolist() == ["Malmö", "Uppsala", "Stockholm"]
     assert isinstance(result, pd.DataFrame)
 
 
 def test_group_revenue_by_date():
-    # Create sample sales date with dates and revenue
     df = pd.DataFrame({
-        "date":["2024-04-16", "2024-04-12", "2024-05-16", "2024-04-12", "2024-05-16"],
-        "revenue":[100, 200, 300, 400, 100]
+        "date": [
+            "2024-04-16", "2024-04-12", "2024-05-16",
+            "2024-04-12", "2024-05-16"
+        ],
+        "revenue": [100, 200, 300, 400, 100]
     })
 
-    # Calculate total revenue for each date
-    result = group_revenue(df,"date")
+    result = group_revenue(df, "date")
 
-    # Verify total revenue for each date and descebding order and return type
     assert result["revenue"].tolist() == [600, 400, 100]
-    assert result["date"].tolist() == ["2024-04-12", "2024-05-16","2024-04-16"]
+    assert result["date"].tolist() == [
+        "2024-04-12", "2024-05-16", "2024-04-16"
+    ]
     assert isinstance(result, pd.DataFrame)
 
-# Test grouping revenue by category
+
 def test_group_revenue_by_category():
-    # Create sample sales data with catagories and revenue
     df = pd.DataFrame({
-        "category":["Home", "Toys", "Sport", "Toys", "Sport"],
-        "revenue":[100, 200, 300, 400, 100]
+        "category": ["Home", "Toys", "Sport", "Toys", "Sport"],
+        "revenue": [100, 200, 300, 400, 100]
     })
 
-    # Calculate total revenue for each category
-    result = group_revenue(df,"category")
+    result = group_revenue(df, "category")
 
-    # Verify total revenue for each category and descending order and return type
     assert result["revenue"].tolist() == [600, 400, 100]
     assert result["category"].tolist() == ["Toys", "Sport", "Home"]
     assert isinstance(result, pd.DataFrame)
 
-# Test calculating revenue by category
+
 def test_revenue_by_category():
-    # Create sample sales data with categories and revenue
     df = pd.DataFrame({
-        "category":["Home", "Toys", "Sport", "Toys", "Sport", "Pets"],
-        "revenue":[100, 200, 300, 400, 100, 800]
+        "category": ["Home", "Toys", "Sport", "Toys", "Sport", "Pets"],
+        "revenue": [100, 200, 300, 400, 100, 800]
     })
 
-    # Calculate total revenue for each category
     result = revenue_by_category(df)
 
-    # Verify total revenue for each category and descending order and return type
     assert result["revenue"].tolist() == [800, 600, 400, 100]
     assert result["category"].tolist() == ["Pets", "Toys", "Sport", "Home"]
     assert isinstance(result, pd.DataFrame)
 
 
-# Test calculating revenue for the top 3 categories 
 def test_revenue_top_3_categories():
-    # Create sample sales data with categories and revenue
     df = pd.DataFrame({
-        "category":["Home", "Toys", "Sport", "Toys", "Sport", "Pets"],
-        "revenue":[100, 200, 300, 400, 100, 800]
+        "category": ["Home", "Toys", "Sport", "Toys", "Sport", "Pets"],
+        "revenue": [100, 200, 300, 400, 100, 800]
     })
 
-    # Calculate revenue for top 3 categories
     result = revenue_top_3_categories(df)
 
-    # Verify the 3 top categories by revenue in descending order and return type
     assert result["revenue"].tolist() == [800, 600, 400]
     assert result["category"].tolist() == ["Pets", "Toys", "Sport"]
     assert isinstance(result, pd.DataFrame)
 
-# Test calculating total revenue by city    
+
 def test_revenue_by_city():
-    # Create sample sales data with cities and revenue
-        df = pd.DataFrame({
-            "city":["Stockholm", "Malmö", "Uppsala", "Malmö", "Dalby", "Uppsala"],
-            "revenue":[100, 200, 300, 400, 50, 100]
-        })
-    
-        # Calculate total revenue for each city
-        result = revenue_by_city(df)
-    
-        # Verify total revenue for each city and descending order and return type
-        assert result["revenue"].tolist() == [600, 400, 100, 50]
-        assert result["city"].tolist() == ["Malmö", "Uppsala", "Stockholm", "Dalby"]
-        assert isinstance(result, pd.DataFrame)
-
-# Test calculating revenue for the top 3 cities
-def test_revenue_top_3_cities():
-    # Create sample sales data with cities and revenue
-        df = pd.DataFrame({
-            "city":["Stockholm", "Malmö", "Uppsala", "Malmö", "Dalby", "Uppsala"],
-            "revenue":[100, 200, 300, 400, 50, 100]
-        })
-    
-        # Calculate revenue for the top 3 cities
-        result = revenue_top_3_cities(df)
-    
-        # Verify the top 3 cities be revenue in descending order and return type
-        assert result["revenue"].tolist() == [600, 400, 100]
-        assert result["city"].tolist() == ["Malmö", "Uppsala", "Stockholm"]
-        assert isinstance(result, pd.DataFrame)
-
-# Test calculating total revenue by month
-def test_revenue_by_month():
-     # Create sample sales date with dates and revenue
-         df = pd.DataFrame({
-             "date":pd.to_datetime(["2025-10-25", "2025-01-26", "2024-10-25", "2024-01-12", "2024-01-10", "2024-01-26"]),
-             "revenue":[100, 200, 300, 400, 50, 100]
-         })
-     
-         # Calculate total revenue for each month
-         result = revenue_by_month(df)
-     
-         # Verify total revenue for each month and sorting order and return type
-         assert result["revenue"].tolist() == [550, 0, 0, 0, 0, 0, 0, 0, 0, 300, 0, 0,  200, 0, 0, 0, 0, 0, 0, 0, 0, 100]
-         assert result["date"].tolist() == [ "January 2024", "February 2024", "March 2024", "April 2024", "May 2024", "June 2024", "July 2024", "August 2024", "September 2024", "October 2024", "November 2024", "December 2024",
-                                            "January 2025", "February 2025", "March 2025", "April 2025", "May 2025", "June 2025", "July 2025", "August 2025", "September 2025", "October 2025",
-                                            ]
-         assert isinstance(result, pd.DataFrame)
-
-# Test calculeting revenue by weekdays
-def test_revenue_by_weekday():
-     # Create sample sales date with revenue and dates
-         df = pd.DataFrame({
-             "date":pd.to_datetime(["2026-10-25", "2026-01-26", "2024-10-25", "2024-01-12", "2024-01-10", "2024-01-26"]),
-             "revenue":[100, 200, 300, 400, 50, 100]
-         })
-     
-         # Calculate total revenue for each weekday
-         result = revenue_by_weekday(df)
-     
-         # Verify total revenue for each weekday and weekday order and return type
-         assert result["revenue"].tolist() == [200, 50, 800, 100]
-         assert result["weekday"].tolist() == ["Monday", "Wednesday","Friday", "Sunday"]
-         assert isinstance(result, pd.DataFrame)
-
-# Test calculating the distributionof order values
-def test_order_value_distribution():
-    # Create sample order data with IDs, dates and revenue
     df = pd.DataFrame({
-        "order_id":[101, 102, 103, 103, 103],
-            "date":["2024-04-16", "2024-04-12", "2024-05-16", "2024-04-12", "2024-05-16"],
-            "revenue":[100, 200, 300, 400, 100]
-        })
+        "city": ["Stockholm", "Malmö", "Uppsala", "Malmö", "Dalby", "Uppsala"],
+        "revenue": [100, 200, 300, 400, 50, 100]
+    })
 
-    # Calculate the minimum, maximum and medisn order revenue
+    result = revenue_by_city(df)
+
+    assert result["revenue"].tolist() == [600, 400, 100, 50]
+    assert result["city"].tolist() == ["Malmö", "Uppsala", "Stockholm", "Dalby"]
+    assert isinstance(result, pd.DataFrame)
+
+
+def test_revenue_top_3_cities():
+    df = pd.DataFrame({
+        "city": ["Stockholm", "Malmö", "Uppsala", "Malmö", "Dalby", "Uppsala"],
+        "revenue": [100, 200, 300, 400, 50, 100]
+    })
+
+    result = revenue_top_3_cities(df)
+
+    assert result["revenue"].tolist() == [600, 400, 100]
+    assert result["city"].tolist() == ["Malmö", "Uppsala", "Stockholm"]
+    assert isinstance(result, pd.DataFrame)
+
+
+def test_revenue_by_month():
+    df = pd.DataFrame({
+        "date": pd.to_datetime([
+            "2025-10-25", "2025-01-26", "2024-10-25",
+            "2024-01-12", "2024-01-10", "2024-01-26"
+        ]),
+        "revenue": [100, 200, 300, 400, 50, 100]
+    })
+
+    result = revenue_by_month(df)
+
+    assert result["revenue"].tolist() == [
+        550, 0, 0, 0, 0, 0, 0, 0, 0, 300, 0, 0,
+        200, 0, 0, 0, 0, 0, 0, 0, 0, 100
+    ]
+
+    assert result["date"].tolist() == [
+        "January 2024", "February 2024", "March 2024",
+        "April 2024", "May 2024", "June 2024",
+        "July 2024", "August 2024", "September 2024",
+        "October 2024", "November 2024", "December 2024",
+        "January 2025", "February 2025", "March 2025",
+        "April 2025", "May 2025", "June 2025",
+        "July 2025", "August 2025", "September 2025",
+        "October 2025"
+    ]
+    assert isinstance(result, pd.DataFrame)
+
+
+def test_revenue_by_weekday():
+    df = pd.DataFrame({
+        "date": pd.to_datetime([
+            "2026-10-25", "2026-01-26", "2024-10-25",
+            "2024-01-12", "2024-01-10", "2024-01-26"
+        ]),
+        "revenue": [100, 200, 300, 400, 50, 100]
+    })
+
+    result = revenue_by_weekday(df)
+
+    assert result["revenue"].tolist() == [200, 50, 800, 100]
+    assert result["weekday"].tolist() == [
+        "Monday", "Wednesday", "Friday", "Sunday"
+    ]
+    assert isinstance(result, pd.DataFrame)
+
+
+def test_order_value_distribution():
+    df = pd.DataFrame({
+        "order_id": [101, 102, 103, 103, 103],
+        "revenue": [100, 200, 300, 400, 100]
+    })
+
     result = calculate_order_value_distribution(df)
-    
-    # Verify the minimum, maximum and median order revenue and return type
+
     assert result == {
         "min_revenue": 100,
-        "max_revenue" : 800,
-        "median_revenue" : 200
+        "max_revenue": 800,
+        "median_revenue": 200
     }
     assert isinstance(result, dict)
     assert type(result["min_revenue"]) is float
     assert type(result["max_revenue"]) is float
     assert type(result["median_revenue"]) is float
 
-# Test calculating average order value (AOV)
+
 def test_calculate_aov():
-    # Create sample order data with IDs, dates and revenues
     df = pd.DataFrame({
-        "order_id":[101, 102, 103, 103, 103],
-            "date":["2024-04-16", "2024-04-12", "2024-05-16", "2024-05-16", "2024-05-16"],
-            "revenue":[100, 200, 300, 400, 100]
-        })
+        "order_id": [101, 102, 103, 103, 103],
+        "revenue": [100, 200, 300, 400, 100]
+    })
 
-    # Calculate the average order value
     result = calculate_aov(df)
 
-    # Verify the expected average order value and return type
-    assert result == 1100/3 
-    assert type(result) is float                                       
+    assert result == pytest.approx(1100 / 3)
+    assert isinstance(result, float)
 
 
-# Test calculating AOV when there are no orders
 def test_calculate_aov_zero():
-    # Create an empty DataFrame with order IDs and revenue
     df = pd.DataFrame({
-        "order_id":[],
-        "revenue":[]
+        "order_id": [],
+        "revenue": []
     })
 
-    # Calculate AOV when there are no orders
     result = calculate_aov(df)
 
-    # Verify that AOV is zero when there are no orders and return type
     assert result == 0.0
-    assert type(result) is float          
+    assert type(result) is float
 
 
-# Test calculating the sidtribution of order values across ranges
 def test_calculate_order_ranges():
-    # Create sample order data with IDs and revenue
     df = pd.DataFrame({
-            "order_id":[101, 102, 103, 104, 105],
-            "revenue":[100, 200, 100, 200, 800]
+        "order_id": [101, 102, 103, 104, 105],
+        "revenue": [100, 200, 100, 200, 800]
     })
 
-    # Calculate the distribution of orders across value ranges
     result = calculate_order_ranges(df)
 
-    # Verify order counts, number of ranges and total percentage and return type
     assert result["number of orders"].sum() == 5
     assert len(result) == 5
-    assert round(result["percentages"].sum(),2)==100
+    assert round(result["percentages"].sum(), 2) == 100
     assert isinstance(result, pd.DataFrame)
 
 
-# Test calculating total revenue
-def test_calculate_total_revenue():
-    # Create sample sales with revenue
+def test_calculate_order_ranges_identical_values():
     df = pd.DataFrame({
-          "revenue": [100, 200, 300]
-     })
-
-    # Calculate total revenue
-    result = calculate_total_revenue(df)
-
-    # Verify the expected total revenue and return type
-    assert result == 600.0
-    assert type(result) is float
-    
-
-# Test calculating total units sold
-def test_calculate_total_units():
-    # Create sample sales data with units
-    df = pd.DataFrame({
-          "units": [4, 0, 7, 2]
+        "order_id": [101, 102, 103],
+        "revenue": [100, 100, 100]
     })
 
-    # Calculate total units sold
+    result = calculate_order_ranges(df)
+
+    assert result.loc["group1", "number of orders"] == 3
+    assert result.loc["group1", "percentages"] == 100.0
+
+
+def test_calculate_total_revenue():
+    df = pd.DataFrame({"revenue": [100, 200, 300]})
+
+    result = calculate_total_revenue(df)
+
+    assert result == 600.0
+    assert type(result) is float
+
+
+def test_calculate_total_units():
+    df = pd.DataFrame({"units": [4, 0, 7, 2]})
+
     result = calculate_total_units(df)
 
-    # Verify the expected total number of units and return type
     assert result == 13
     assert type(result) is int
 
 
 def test_calculate_total_units_missing_values():
     for value in [None, float("nan")]:
-        df = pd.DataFrame( {"units": [4, value, 2]})
+        df = pd.DataFrame({"units": [4, value, 2]})
 
         with pytest.raises(ValueError):
             calculate_total_units(df)
 
 
-# Test infinite and fractional values
 def test_calculate_total_units_invalid_values():
-     for value in [float("inf"), float("-inf"), 2.5]:
-          df = pd.DataFrame({"units": [4, value ,2]})
+    for value in [float("inf"), float("-inf"), 2.5]:
+        df = pd.DataFrame({"units": [4, value, 2]})
 
-          with pytest.raises(ValueError):
-               calculate_total_units(df)
+        with pytest.raises(ValueError):
+            calculate_total_units(df)
 
-   
-def test_calulate_descriptive_statistics():
-    # Create sample order data with IDs and revenue
+
+def test_calculate_order_value_std():
     df = pd.DataFrame({
-        "order_id":[101, 102, 103, 104, 105],
-        "revenue":[100, 200, 100, 200, 800]
+        "order_id": [101, 102, 103],
+        "revenue": [100, 200, 300]
     })
-     
-    # Calculate the 
+
+    result = calculate_order_value_std(df)
+
+    assert result == pytest.approx(100.0)
+    assert isinstance(result, float)
+
+
+def test_calculate_order_value_variance():
+    df = pd.DataFrame({
+        "order_id": [101, 102, 103],
+        "revenue": [100, 200, 300]
+    })
+
+    result = calculate_order_value_variance(df)
+
+    assert result == pytest.approx(10000.0)
+    assert isinstance(result, float)
+
+
+def test_calculate_order_value_std_identical_values():
+    df = pd.DataFrame({
+        "order_id": [101, 102, 103],
+        "revenue": [100, 100, 100]
+    })
+
+    result = calculate_order_value_std(df)
+
+    assert result == 0.0
+    assert isinstance(result, float)
+
+
+def test_calculate_order_value_variance_identical_values():
+    df = pd.DataFrame({
+        "order_id": [101, 102, 103],
+        "revenue": [100, 100, 100]
+    })
+
+    result = calculate_order_value_variance(df)
+
+    assert result == 0.0
+    assert isinstance(result, float)
+
+
+def test_get_order_range_boundaries():
+    df = pd.DataFrame({
+        "order_id": [101, 102, 103, 104, 105],
+        "revenue": [100, 200, 300, 400, 800]
+    })
+
+    result = get_order_range_boundaries(df)
+
+    assert result == [100.0, 180.0, 260.0, 340.0, 570.0, 800.0]
+    assert isinstance(result, list)
+    assert all(isinstance(value, float) for value in result)
+
+
+def test_calculate_order_value_std_empty_dataframe():
+    df = pd.DataFrame({
+        "order_id": [],
+        "revenue": []
+    })
+
+    result = calculate_order_value_std(df)
+
+    assert pd.isna(result)
+    assert isinstance(result, float)
+
+
+def test_calculate_order_value_variance_empty_dataframe():
+    df = pd.DataFrame({
+        "order_id": [],
+        "revenue": []
+    })
+
+    result = calculate_order_value_variance(df)
+
+    assert pd.isna(result)
+    assert isinstance(result, float)
+
+
+def test_calulate_descriptive_statistics():
+    df = pd.DataFrame({
+        "order_id": [101, 102, 103, 104, 105],
+        "revenue": [100, 200, 100, 200, 800]
+    })
+
     result = calulate_descriptive_statistics(df)
-     
-    # Verify mode, quartiles, IQR and return type
+
     assert result["mode"] == [100, 200]
     assert result["q1"] == 100
     assert result["q3"] == 200
     assert result["iqr"] == 100
-    assert isinstance(result["mode"], list)
-    assert isinstance(result["q1"], (int, float))
-    assert isinstance(result["q3"], (int, float))
-    assert isinstance(result["iqr"], (int, float))
 
 
 def test_calculate_order_z_scores():
-# Create sample order data with IDs and revenue
     df = pd.DataFrame({
-        "order_id":[101, 102, 103, 104, 105],
-        "revenue":[100, 200, 100, 200, 800]
+        "order_id": [101, 102, 103, 104, 105],
+        "revenue": [100, 200, 100, 200, 800]
     })
 
-    # Calculate z-scores for test orders
-    result = calculate_order_z_scores(df)
-    result = result.sort_values("order_id")
+    result = calculate_order_z_scores(df).sort_values("order_id")
 
-    # Verify z -scores for orders
-    assert result["z_score"].round(3).tolist() == [-0.610, -0.271, -0.610, -0.271, 1.763]
+    assert result["z_score"].round(3).tolist() == [
+        -0.610, -0.271, -0.610, -0.271, 1.763
+    ]
     assert isinstance(result, pd.DataFrame)
 
+
 def test_detect_outliers():
-    # Create sample order data with IDs and revenue
     df = pd.DataFrame({
-        "order_id":[101, 102, 103, 104, 105, 106, 107],
-        "revenue":[10, 400, 500, 400, 500, 450, 1200]
+        "order_id": [101, 102, 103, 104, 105, 106, 107],
+        "revenue": [10, 400, 500, 400, 500, 450, 1200]
     })
 
-    # Detect outliers in test orders
     result = detect_outliers(df)
 
-    # Verify that exactly two outliers was found and their order_ids
     assert len(result) == 2
     assert sorted(result["order_id"].tolist()) == [101, 107]
     assert isinstance(result, pd.DataFrame)
 
+
 def test_calculate_units_revenue_correlation():
-# Create sample order data with IDs and revenue
     df = pd.DataFrame({
-        "units":[5, 10, 4, 2, 5],
-        "revenue":[100, 200, 400, 500, 300]
+        "units": [5, 10, 4, 2, 5],
+        "revenue": [100, 200, 400, 500, 300]
     })
+
     result = calculate_units_revenue_correlation(df)
-    
+
     df_zero = pd.DataFrame({
-        "units":[3, 1, 2],
-        "revenue":[100, 100, 200]
+        "units": [3, 1, 2],
+        "revenue": [100, 100, 200]
     })
     result_zero = calculate_units_revenue_correlation(df_zero)
 
-    # testing correlation when all units values are equal
-    # Create sample order data with IDs and revenue
     df_const = pd.DataFrame({
-        "units":[10, 10, 10, 10],
-        "revenue":[100, 200, 400, 500]
+        "units": [10, 10, 10, 10],
+        "revenue": [100, 200, 400, 500]
     })
     result_const = calculate_units_revenue_correlation(df_const)
 
-    # testing correlation with an empty DataFrame
-    df_empty = pd. DataFrame(columns=["units", "revenue"])
-
+    df_empty = pd.DataFrame(columns=["units", "revenue"])
     result_empty = calculate_units_revenue_correlation(df_empty)
+
     assert round(result, 3) == -0.643
     assert round(result_zero, 3) == 0.0
     assert pd.isna(result_const)
     assert pd.isna(result_empty)
+    assert isinstance(result, (float, np.floating))
     assert isinstance(result_zero, (float, np.floating))
     assert isinstance(result_const, (float, np.floating))
     assert isinstance(result_empty, (float, np.floating))
-    assert isinstance(result, (float, np.floating))
-  
