@@ -5,6 +5,10 @@ from pandas import DataFrame
 
 from .io_utils import load_data
 from . import metrics
+<<<<<<< HEAD
+=======
+from . import viz
+>>>>>>> origin/main
 
 
 # Return type of the Summery() function as a typed dictionary
@@ -53,10 +57,26 @@ class CommerceAnalyzer:
         return metrics.revenue_top_3_categories(self.dataframe)
 
 
-    def order_value_distribution(self) -> dict[str, float]:
+    def order_value_distribution(self) -> OrderValueDistributionData:
         result = metrics.calculate_order_value_distribution(self.dataframe)
 
         return {key: float(value) for key, value in result.items()}
 
-    def revenue_by_city(self) -> DataFrame: 
+    def order_ranges(self) -> DataFrame:
+        return metrics.calculate_order_ranges(self.dataframe)
+
+    def revenue_by_city(self) -> DataFrame:
         return metrics.revenue_by_city(self.dataframe)
+
+    def plot_monthly_revenue(self) -> None:
+        viz.plot_monthly_revenue(self.dataframe)
+
+    def plot_order_value_distribution(self) -> None:
+        order_ranges_df = self.order_ranges()
+        viz.plot_order_value_distribution(order_ranges_df)
+
+    def plot_revenue_distribution_city(self) -> None:
+        viz.plot_revenue_distribution_city(self.dataframe)
+
+    def plot_revenue_distribution_category(self) -> None:
+        viz.plot_revenue_distribution_category(self.dataframe)
