@@ -59,6 +59,8 @@ class CommerceAnalyzer:
 
         return {key: float(value) for key, value in result.items()}
 
+    def order_ranges(self) -> DataFrame:
+        return metrics.calculate_order_ranges(self.dataframe)
 
     def revenue_by_city(self) -> DataFrame:
         return metrics.revenue_by_city(self.dataframe)
