@@ -3,15 +3,8 @@ from typing import TypedDict
 
 from pandas import DataFrame
 
-from io_utils import load_data
-import metrics
+from . import io_utils, metrics, viz
 
-from metrics import (
-    calculate_total_revenue,
-    calculate_total_units,
-    count_orders,
-    calculate_aov,
-)
 
 # Return type of the Summery() function as a typed dictionary
 class SummaryData(TypedDict):
@@ -34,35 +27,56 @@ class CommerceAnalyzer:
     file_path: str | Path
     dataframe: DataFrame
 
-
     def __init__(self, file_path: str | Path) -> None:
         self.file_path = file_path
-        self.dataframe = load_data(self.file_path)
+        self.dataframe = io_utils.load_data(self.file_path)
 
     def summary(self) -> SummaryData:
         return {
-            "total_revenue": calculate_total_revenue(self.dataframe),
-            "total_units": calculate_total_units(self.dataframe),
-            "order_count": count_orders(self.dataframe),
-            "aov": calculate_aov(self.dataframe),
+            "total_revenue": metrics.calculate_total_revenue(self.dataframe),
+            "total_units": metrics.calculate_total_units(self.dataframe),
+            "order_count": metrics.count_orders(self.dataframe),
+            "aov": metrics.calculate_aov(self.dataframe),
         }
 
     def revenue_by_category(self) -> DataFrame:
         return metrics.revenue_by_category(self.dataframe)
 
-
-    def revenue_by_month(self) -> DataFrame:  
+    def revenue_by_month(self) -> DataFrame:
         return metrics.revenue_by_month(self.dataframe)
 
-
-    def revenue_top_3_categories(self) -> DataFrame:  
+    def revenue_top_3_categories(self) -> DataFrame:
         return metrics.revenue_top_3_categories(self.dataframe)
 
-
-    def order_value_distribution(self) -> dict[str, float]:
+    def order_value_distribution(self) -> OrderValueDistributionData:
         result = metrics.calculate_order_value_distribution(self.dataframe)
+        return {
+            "min_revenue": result["min_revenue"],
+            "median_revenue": result["median_revenue"],
+            "max_revenue": result["max_revenue"]
+        }
 
-        return {key: float(value) for key, value in result.items()}
+    def order_ranges(self) -> DataFrame:
+        return metrics.calculate_order_ranges(self.dataframe)
 
-    def revenue_by_city(self) -> DataFrame: 
+    def revenue_by_city(self) -> DataFrame:
         return metrics.revenue_by_city(self.dataframe)
+
+    def plot_revenue_category_city(self) -> None:
+        category_revenue = self.revenue_by_category()
+        city_revenue = self.revenue_by_city()
+
+        viz.plot_revenue_category_city(category_revenue, city_revenue)
+        
+    def plot_monthly_revenue(self) -> None:
+        viz.plot_monthly_revenue(self.dataframe)
+
+    def plot_order_value_distribution(self) -> None:
+        order_ranges_df = self.order_ranges()
+        viz.plot_order_value_distribution(order_ranges_df)
+
+    def plot_revenue_distribution_city(self) -> None:
+        viz.plot_revenue_distribution_city(self.dataframe)
+
+    def plot_revenue_distribution_category(self) -> None:
+        viz.plot_revenue_distribution_category(self.dataframe)
