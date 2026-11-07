@@ -119,7 +119,7 @@ def order_totals(df: DataFrame) -> DataFrame:
 
 def order_summary(df: DataFrame) -> dict[str, float]:
     """
-    Return statistics for combined order revenues using linear quantile interpolation. Invalid input raises ValueError.
+    Return statistics for combined order revenues using linear quantile interpolation. Invalid input raises ValueError. Empty input with required columns still returns all seven keys.
     """
     aov = calculate_aov(df)
     distribution = calculate_order_value_distribution(df)
