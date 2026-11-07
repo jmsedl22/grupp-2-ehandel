@@ -17,6 +17,7 @@ from src.metrics import (
     revenue_by_category,
     revenue_by_city,
     revenue_by_month,
+    monthly_summary,
     revenue_by_weekday,
     revenue_top_3_categories,
     revenue_top_3_cities,
@@ -453,3 +454,136 @@ def test_calculate_units_revenue_correlation():
     assert isinstance(result_zero, (float, np.floating))
     assert isinstance(result_const, (float, np.floating))
     assert isinstance(result_empty, (float, np.floating))
+
+
+def test_monthly_summary_full_leap_month():
+    df = pd.DataFrame({
+        "date": pd.date_range("2024-02-01", "2024-02-29"),
+        "order_id": range(29),
+        "revenue": [10.0] * 29,
+    })
+
+    result = monthly_summary(df)
+    row = result.iloc[0]
+
+    assert list(result.columns) == [
+        "month",
+        "revenue",
+        "order_count",
+        "calendar_days",
+        "observed_days",
+        "coverage_status",
+        "revenue_per_day",
+        "aov",
+    ]
+    assert row["month"] == pd.Timestamp("2024-02-01")
+    assert row["revenue"] == pytest.approx(290.0)
+    assert row["order_count"] == 29
+    assert row["calendar_days"] == 29
+    assert row["observed_days"] == 29
+    assert row["coverage_status"] == "all_days_observed"
+    assert row["revenue_per_day"] == pytest.approx(10.0)
+    assert row["aov"] == pytest.approx(10.0)
+
+
+def test_monthly_summary_partial_and_missing_months():
+    df = pd.DataFrame({
+        "date": pd.to_datetime([
+            "2024-03-01 09:00:00",
+            "2024-01-31 15:00:00",
+            "2024-01-31 09:00:00",
+        ]),
+        "order_id": ["A", "A", "A"],
+        "revenue": ["0", "49.75", "100.25"],
+    })
+    original = df.copy(deep=True)
+
+    result = monthly_summary(df)
+
+    assert result["month"].tolist() == [
+        pd.Timestamp("2024-01-01"),
+        pd.Timestamp("2024-02-01"),
+        pd.Timestamp("2024-03-01"),
+    ]
+    assert result["calendar_days"].tolist() == [31, 29, 31]
+    assert result["order_count"].tolist() == [1, 0, 1]
+    assert result["observed_days"].tolist() == [1, 0, 1]
+    assert result["coverage_status"].tolist() == [
+        "partial", "no_observations", "partial",
+    ]
+    assert result["revenue_per_day"].isna().all()
+
+    january, february, march = [result.iloc[i] for i in range(3)]
+
+    assert january["revenue"] == pytest.approx(150.0)
+    assert january["aov"] == pytest.approx(150.0)
+
+    assert pd.isna(february["revenue"])
+    assert pd.isna(february["aov"])
+
+    # An observed zero is different from an unobserved month.
+    assert march["revenue"] == 0.0
+    assert march["aov"] == 0.0
+
+    pd.testing.assert_frame_equal(df, original)
+
+
+def test_monthly_summary_empty_input():
+    df = pd.DataFrame(columns=["date", "order_id", "revenue"])
+
+    result = monthly_summary(df)
+
+    assert result.empty
+    assert list(result.columns) == [
+        "month",
+        "revenue",
+        "order_count",
+        "calendar_days",
+        "observed_days",
+        "coverage_status",
+        "revenue_per_day",
+        "aov",
+    ]
+    assert pd.api.types.is_datetime64_any_dtype(result["month"])
+    assert pd.api.types.is_string_dtype(result["coverage_status"])
+
+    for column in ["order_count", "calendar_days", "observed_days"]:
+        assert pd.api.types.is_integer_dtype(result[column])
+
+    for column in ["revenue", "revenue_per_day", "aov"]:
+        assert pd.api.types.is_float_dtype(result[column])
+
+
+@pytest.mark.parametrize("column", ["date", "order_id", "revenue"])
+def test_monthly_summary_rejects_missing_columns_even_when_empty(column):
+    df = pd.DataFrame(columns=["date", "order_id", "revenue"])
+    df = df.drop(columns=[column])
+
+    with pytest.raises(ValueError):
+        monthly_summary(df)
+
+
+@pytest.mark.parametrize(
+    "column, value",
+    [
+        ("order_id", None),
+        ("revenue", "not numeric"),
+        ("revenue", None),
+        ("revenue", np.nan),
+        ("revenue", np.inf),
+        ("revenue", -np.inf),
+        ("date", "not a date"),
+        ("date", None),
+        ("date", pd.NaT),
+    ],
+)
+def test_monthly_summary_rejects_invalid_values(column, value):
+    data = {
+        "date": ["2024-01-01"],
+        "order_id": ["A"],
+        "revenue": [10.0],
+    }
+    data[column] = [value]
+
+    with pytest.raises(ValueError):
+        monthly_summary(pd.DataFrame(data))

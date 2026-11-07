@@ -241,6 +241,110 @@ def revenue_by_month(df: DataFrame)  -> DataFrame:
     return group_month
 
 
+def monthly_summary(df: DataFrame) -> DataFrame:
+    """Return chronological monthly revenue and order counts."""
+    required_cols = {"date", "order_id", "revenue"}
+    missing_cols = required_cols - set(df.columns)
+
+    if missing_cols:
+        raise ValueError(
+            f"Missing required columns: {', '.join(sorted(missing_cols))}"
+        )
+
+    df_required = df[["date", "order_id", "revenue"]].copy()
+
+    if df_required["order_id"].isna().any():
+        raise ValueError("Order IDs cannot contain missing values")
+
+    try:
+        revenue = pd.to_numeric(df_required["revenue"], errors="raise")
+    except (ValueError, TypeError) as exc:
+        raise ValueError("Revenue must contain numeric values") from exc
+
+    if revenue.isna().any():
+        raise ValueError("Revenue cannot contain missing values")
+
+    if not np.isfinite(revenue.to_numpy(dtype=float)).all():
+        raise ValueError("Revenue must contain finite values")
+
+    df_required["revenue"] = revenue
+
+    try:
+        dates = pd.to_datetime(df_required["date"], errors="raise")
+    except (ValueError, TypeError, OverflowError) as exc:
+        raise ValueError("Dates must contain valid datetime values") from exc
+
+    if dates.isna().any():
+        raise ValueError("Dates cannot contain missing values")
+
+    df_required["date"] = dates
+
+    column_dtypes = {
+        "month": "datetime64[ns]",
+        "revenue": "float64",
+        "order_count": "int64",
+        "calendar_days": "int64",
+        "observed_days": "int64",
+        "coverage_status": "string",
+        "revenue_per_day": "float64",
+        "aov": "float64",
+    }
+
+    if df_required.empty:
+        return DataFrame({
+            column: pd.Series(dtype=dtype)
+            for column, dtype in column_dtypes.items()
+        })
+
+    df_required["observed_date"] = df_required["date"].dt.normalize()
+    df_required["month"] = (
+        df_required["date"].dt.to_period("M").dt.to_timestamp()
+    )
+
+    monthly = df_required.groupby("month").agg(
+        revenue=("revenue", "sum"),
+        order_count=("order_id", "nunique"),
+        observed_days=("observed_date", "nunique"),
+    )
+
+    months = pd.date_range(
+        start=monthly.index.min(),
+        end=monthly.index.max(),
+        freq="MS",
+        name="month",
+    )
+    monthly = monthly.reindex(months)
+
+    for column in ["order_count", "observed_days"]:
+        monthly[column] = monthly[column].fillna(0).astype("int64")
+
+    monthly["calendar_days"] = months.days_in_month
+
+    has_observations = monthly["observed_days"] > 0
+    all_days_observed = (
+        monthly["observed_days"] == monthly["calendar_days"]
+    )
+
+    monthly["coverage_status"] = pd.Series(
+        "no_observations",
+        index=monthly.index,
+        dtype="string",
+    )
+    monthly.loc[has_observations, "coverage_status"] = "partial"
+    monthly.loc[all_days_observed, "coverage_status"] = "all_days_observed"
+
+    monthly["revenue_per_day"] = (
+        monthly["revenue"] / monthly["calendar_days"]
+    ).where(all_days_observed)
+
+    positive_order_count = monthly["order_count"].where(
+        monthly["order_count"] > 0
+    )
+    monthly["aov"] = monthly["revenue"] / positive_order_count
+
+    return monthly.reset_index()[list(column_dtypes)]
+
+
 # Group revenue by weekday
 def revenue_by_weekday(df: DataFrame)  -> DataFrame:
 
