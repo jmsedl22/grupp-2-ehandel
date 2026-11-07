@@ -93,6 +93,7 @@ def _group_revenue_summary(df: DataFrame, group_by: str) -> DataFrame:
             f"Missing required columns: {', '.join(sorted(missing_cols))}")
 
     df_required = df[[group_by, "revenue"]].copy()
+    df_required[group_by] = df_required[group_by].astype(object)
 
     try:
         revenue = pd.to_numeric(df_required["revenue"], errors="raise")
@@ -132,6 +133,20 @@ def _group_revenue_summary(df: DataFrame, group_by: str) -> DataFrame:
 def category_summary(df: DataFrame) -> DataFrame:
     """Return category revenue totals and percentage shares of all revenue."""
     return _group_revenue_summary(df, "category")
+
+
+def city_summary(df: DataFrame) -> DataFrame:
+    """Return city, revenue and share_pct, with shares of total revenue."""
+    return _group_revenue_summary(df, "city")
+
+
+def top_categories_summary(df: DataFrame, n: int = 3) -> DataFrame:
+    """Return the top n categories with revenue shares."""
+    if (not isinstance(n, (int, np.integer)) or n <= 0):
+        raise ValueError("n must be a positive integer")
+
+    categories = category_summary(df)
+    return categories.head(int(n))
 
 
 def order_totals(df: DataFrame) -> DataFrame:
