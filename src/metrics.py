@@ -79,6 +79,61 @@ def group_revenue(df: DataFrame, group_by: str | pd.Grouper ) -> DataFrame:
     return group
 
 
+def _group_revenue_summary(df: DataFrame, group_by: str) -> DataFrame:
+    """
+    Return grouped revenue and percentage shares of total input revenue. Empty
+    input returns the same three columns. Zero total gives NaN shares. Raise
+    ValueError for missing required columns or invalid revenue.
+    """
+    required_cols = {group_by, 'revenue'}
+    missing_cols = required_cols - set(df.columns)
+
+    if missing_cols:
+        raise ValueError(
+            f"Missing required columns: {', '.join(sorted(missing_cols))}")
+
+    df_required = df[[group_by, "revenue"]].copy()
+
+    try:
+        revenue = pd.to_numeric(df_required["revenue"], errors="raise")
+    except (ValueError, TypeError) as exc:
+        raise ValueError("Revenue must contain numeric values") from exc
+
+    if revenue.isna().to_numpy().any():
+        raise ValueError("Revenue cannot contain missing values")
+
+    if not np.isfinite(revenue.to_numpy(dtype=float)).all():
+        raise ValueError("Revenue must contain finite values")
+
+    df_required["revenue"] = revenue
+    total_revenue = revenue.sum()
+
+    groups = df_required.groupby(
+        group_by,
+        as_index=False,
+        dropna=False,
+        observed=True,
+    )[["revenue"]].sum()
+
+    if total_revenue == 0:
+        groups["share_pct"] = float("nan")
+    else:
+        groups["share_pct"] = groups["revenue"] / total_revenue * 100
+
+    groups = groups.sort_values(
+        by=["revenue", group_by],
+        ascending=[False, True],
+        na_position="last",
+    )
+
+    return groups[[group_by, "revenue", "share_pct"]]
+
+
+def category_summary(df: DataFrame) -> DataFrame:
+    """Return category revenue totals and percentage shares of all revenue."""
+    return _group_revenue_summary(df, "category")
+
+
 def order_totals(df: DataFrame) -> DataFrame:
     """
     Return order_id and summed, unrounded revenue, sorted by revenue descending.
