@@ -18,6 +18,7 @@ from src.metrics import (
     detect_outliers,
     get_order_range_boundaries,
     group_revenue,
+    monthly_category_summary,
     monthly_summary,
     revenue_by_category,
     revenue_by_city,
@@ -587,3 +588,132 @@ def test_monthly_summary_rejects_invalid_values(column, value):
 
     with pytest.raises(ValueError):
         monthly_summary(pd.DataFrame(data))
+
+
+def test_monthly_category_summary_shared_range_and_observed_zero():
+    df = pd.DataFrame({
+        "date": ["2024-03-10", "2024-01-15", "2024-01-20"],
+        "category": ["Clothing", "Books", "Books"],
+        "revenue": ["300.75", "20.125", "-20.125"],
+    })
+    original = df.copy(deep=True)
+
+    result = monthly_category_summary(df)
+
+    assert list(result.columns) == ["month", "category", "revenue"]
+    assert pd.api.types.is_datetime64_any_dtype(result["month"])
+    assert result["month"].tolist() == [
+        pd.Timestamp("2024-01-01"),
+        pd.Timestamp("2024-01-01"),
+        pd.Timestamp("2024-02-01"),
+        pd.Timestamp("2024-02-01"),
+        pd.Timestamp("2024-03-01"),
+        pd.Timestamp("2024-03-01"),
+    ]
+    assert result["category"].tolist() == ["Books", "Clothing"] * 3
+
+    np.testing.assert_allclose(
+        result["revenue"].to_numpy(),
+        [0.0, np.nan, np.nan, np.nan, np.nan, 300.75],
+        equal_nan=True,
+    )
+    pd.testing.assert_frame_equal(df, original)
+
+
+def test_monthly_category_summary_categorical_and_missing_labels():
+    df = pd.DataFrame({
+        "date": [
+            "2024-01-01",
+            "2024-01-01",
+            "2024-01-01",
+            "2024-03-01",
+        ],
+        "category": pd.Categorical(
+            ["B", None, "A", None],
+            categories=["B", "A", "Unused"],
+            ordered=True,
+        ),
+        "revenue": [1.0, 2.0, 3.0, 4.0],
+    })
+    original = df.copy(deep=True)
+
+    result = monthly_category_summary(df)
+
+    # Only A, B, and the missing-label group appear in each month.
+    assert len(result) == 9
+    assert not isinstance(result["category"].dtype, pd.CategoricalDtype)
+
+    for month in pd.date_range("2024-01-01", "2024-03-01", freq="MS"):
+        rows = result.loc[result["month"] == month]
+
+        assert len(rows) == 3
+        assert rows["category"].iloc[:2].tolist() == ["A", "B"]
+        assert pd.isna(rows["category"].iloc[2])
+
+    np.testing.assert_allclose(
+        result["revenue"].to_numpy(),
+        [
+            3.0, 1.0, 2.0,
+            np.nan, np.nan, np.nan,
+            np.nan, np.nan, 4.0,
+        ],
+        equal_nan=True,
+    )
+    pd.testing.assert_frame_equal(df, original)
+
+
+def test_monthly_category_summary_empty_input():
+    df = pd.DataFrame(columns=["date", "category", "revenue"])
+
+    result = monthly_category_summary(df)
+
+    expected = pd.DataFrame({
+        "month": pd.Series(dtype="datetime64[ns]"),
+        "category": pd.Series(dtype=object),
+        "revenue": pd.Series(dtype="float64"),
+    })
+    pd.testing.assert_frame_equal(result, expected)
+
+
+@pytest.mark.parametrize("column", ["date", "category", "revenue"])
+@pytest.mark.parametrize("empty", [False, True])
+def test_monthly_category_summary_rejects_missing_columns(column, empty):
+    df = pd.DataFrame({
+        "date": ["2024-01-01"],
+        "category": ["Books"],
+        "revenue": [10.0],
+    })
+    if empty:
+        df = df.iloc[:0]
+
+    df = df.drop(columns=[column])
+
+    with pytest.raises(ValueError):
+        monthly_category_summary(df)
+
+
+@pytest.mark.parametrize(
+    "column, value",
+    [
+        ("revenue", "not numeric"),
+        ("revenue", None),
+        ("revenue", np.nan),
+        ("revenue", np.inf),
+        ("revenue", -np.inf),
+        ("date", "not a date"),
+        ("date", None),
+        ("date", pd.NaT),
+    ],
+)
+
+
+def test_monthly_category_summary_rejects_invalid_values(column, value):
+    data = {
+        "date": ["2024-01-01"],
+        "category": ["Books"],
+        "revenue": [10.0],
+    }
+    data[column] = [value]
+
+    with pytest.raises(ValueError):
+        monthly_category_summary(pd.DataFrame(data))

@@ -355,6 +355,90 @@ def monthly_summary(df: DataFrame) -> DataFrame:
     return monthly.reset_index()[list(column_dtypes)]
 
 
+def monthly_category_summary(df: DataFrame) -> DataFrame:
+    """Return month, category and revenue in chronological order.
+
+    Observed categories share one monthly range, from the earliest
+    to the latest month across the entire input. Missing category labels
+    remain a separate group. NaN revenue means no observations for that
+    month/category combination.
+
+    Empty input with required columns returns a typed empty table.
+    Invalid input raises ValueError. Dates are expected to be timezone-naive.
+    """
+    required_cols = {"date", "category", "revenue"}
+    missing_cols = required_cols - set(df.columns)
+
+    if missing_cols:
+        raise ValueError(
+            f"Missing required columns: {', '.join(sorted(missing_cols))}")
+
+    df_required = df[["date", "category", "revenue"]].copy()
+    df_required["category"] = df_required["category"].astype(object)
+
+    try:
+        revenue = pd.to_numeric(df_required["revenue"], errors="raise")
+    except (ValueError, TypeError) as exc:
+        raise ValueError("Revenue must contain numeric values") from exc
+
+    if revenue.isna().any():
+        raise ValueError("Revenue cannot contain missing values")
+
+    if not np.isfinite(revenue.to_numpy(dtype=float)).all():
+        raise ValueError("Revenue must contain finite values")
+
+    df_required["revenue"] = revenue
+
+    try:
+        dates = pd.to_datetime(df_required["date"], errors="raise")
+    except (ValueError, TypeError, OverflowError) as exc:
+        raise ValueError("Dates must contain valid datetime values") from exc
+
+    if dates.isna().any():
+        raise ValueError("Dates cannot contain missing values")
+
+    df_required["date"] = dates
+
+    if df_required.empty:
+        return DataFrame({
+            "month": pd.Series(dtype="datetime64[ns]"),
+            "category": pd.Series(dtype=object),
+            "revenue": pd.Series(dtype="float64"),
+        })
+
+    df_required["month"] = (
+        df_required["date"].dt.to_period("M").dt.to_timestamp()
+    )
+
+    grouped = df_required.groupby(
+        ["month", "category"],
+        dropna=False,
+        observed=True,
+    )[["revenue"]].sum()
+
+    months = pd.date_range(
+        start=df_required["month"].min(),
+        end=df_required["month"].max(),
+        freq="MS",
+    )
+    categories = grouped.index.get_level_values("category").unique()
+
+    complete_index = pd.MultiIndex.from_product(
+        [months, categories],
+        names=["month", "category"],
+    )
+
+    result = grouped.reindex(complete_index).reset_index()
+    result = result.sort_values(
+        by=["month", "category"],
+        ascending=[True, True],
+        na_position="last",
+        ignore_index=True,
+    )
+
+    return result[["month", "category", "revenue"]]
+
+
 # Group revenue by weekday
 def revenue_by_weekday(df: DataFrame)  -> DataFrame:
 
