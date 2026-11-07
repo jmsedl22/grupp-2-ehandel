@@ -182,7 +182,7 @@ def revenue_by_weekday(df: DataFrame)  -> DataFrame:
 # Calculate minumum, maximum and median order reveneu
 def calculate_order_value_distribution(df: DataFrame) -> dict[str, float]:
     # Calculate total revenue for each order
-    orders_total_revenues = group_revenue(df, "order_id")
+    orders_total_revenues = order_totals(df)
 
     # Find the minimum order revenue
     min_revenue = orders_total_revenues["revenue"].min()
@@ -204,7 +204,7 @@ def calculate_order_ranges(df: DataFrame) -> DataFrame:
     from_to = _calculate_order_boundaries(df)
 
     # Calculate total revenue for each order
-    orders = group_revenue(df, "order_id")
+    orders = order_totals(df)
 
     # Handle orders with identical revenue values
     if len(from_to) == 1:
@@ -244,7 +244,7 @@ def calculate_order_ranges(df: DataFrame) -> DataFrame:
 # Calculate standard deviation of order values
 def calculate_order_value_std(df: DataFrame) -> float:
     # Calculate total revenue for each order
-    order = group_revenue(df, "order_id")
+    order = order_totals(df)
 
     # Calculate standart deviation
     std = order["revenue"].std()
@@ -260,7 +260,7 @@ def get_order_range_boundaries(df:DataFrame) -> list[float]:
 # Calculate variance of order values
 def calculate_order_value_variance(df: DataFrame) -> float:
     # Calculate total revenue for each order
-    orders = group_revenue(df, "order_id")
+    orders = order_totals(df)
     variance = orders["revenue"].var()
 
     return float(variance)
@@ -309,7 +309,7 @@ def _calculate_order_boundaries(df: DataFrame) -> list[float]:
 
 # Calculate mode, quartiles and IRQ of order values
 def calulate_descriptive_statistics(df:DataFrame) -> dict:
-    orders = group_revenue(df, "order_id")
+    orders = order_totals(df)
     values = orders["revenue"]
 
     if values.empty:
@@ -331,7 +331,7 @@ def calulate_descriptive_statistics(df:DataFrame) -> dict:
 # Detect outliners in order values using the IQR methot
 def detect_outliers(df: DataFrame) -> DataFrame:
 
-    orders = group_revenue(df, "order_id")
+    orders = order_totals(df)
     stats = calulate_descriptive_statistics(df)
 
     if not stats:
@@ -354,7 +354,7 @@ def detect_outliers(df: DataFrame) -> DataFrame:
     return outliers
 
 def calculate_order_z_scores(df: DataFrame) -> DataFrame:
-    orders = group_revenue(df, "order_id")
+    orders = order_totals(df)
 
     # Get order revenue values
     values = orders["revenue"]
