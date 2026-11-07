@@ -149,6 +149,95 @@ def top_categories_summary(df: DataFrame, n: int = 3) -> DataFrame:
     return categories.head(int(n))
 
 
+def data_overview(df: DataFrame) -> dict[str, object]:
+    """Return data-quality counts, date bounds, and dates without observations.
+
+    Missing values and numeric infinities are allowed. Discrepancy checks
+    include only rows with present, finite price, units, and revenue values.
+    Missing-value and duplicate counts use the original input.
+
+    Invalid dates are excluded from date bounds and calendar coverage.
+    Dates without observations do not establish that sales were zero.
+    Empty input with required columns returns zero counts and no date range.
+    """
+    required_cols = {"date", "order_id", "price", "units", "revenue"}
+    missing_cols = required_cols - set(df.columns)
+
+    if missing_cols:
+        raise ValueError(
+            f"Missing required columns: {', '.join(sorted(missing_cols))}")
+
+    missing_values_by_column = {
+        column: int(count)
+        for column, count in df.isna().sum().items()
+    }
+    missing_values_total = sum(missing_values_by_column.values())
+    duplicate_row_count = int(df.duplicated().sum())
+
+    numeric = df[["price", "units", "revenue"]].copy()
+
+    for column in numeric.columns:
+        try:
+            numeric[column] = pd.to_numeric(numeric[column], errors="raise")
+        except (ValueError, TypeError) as exc:
+            raise ValueError(
+                f"{column} must contain numeric values"
+            ) from exc
+
+    negative_numeric_row_count = int(
+        numeric.lt(0).any(axis=1).sum()
+    )
+
+    # NaN and infinity both fail the finite-value check.
+    numeric_values = numeric.to_numpy(dtype=float, na_value=np.nan)
+    valid_rows = np.isfinite(numeric_values).all(axis=1)
+    valid_values = numeric_values[valid_rows]
+
+    matches = np.isclose(
+        valid_values[:, 0] * valid_values[:, 1],
+        valid_values[:, 2],
+        atol=0.01,
+        rtol=0,
+    )
+    price_units_discrepancy_count = int((~matches).sum())
+
+    dates = pd.to_datetime(df["date"], errors="coerce")
+    valid_dates = dates.dropna()
+
+    if valid_dates.empty:
+        date_min = pd.NaT
+        date_max = pd.NaT
+        dates_without_observations = pd.DatetimeIndex([])
+    else:
+        date_min = valid_dates.min()
+        date_max = valid_dates.max()
+
+        observed_dates = pd.DatetimeIndex(
+            valid_dates.dt.normalize().unique()
+        )
+        calendar_dates = pd.date_range(
+            start=observed_dates.min(),
+            end=observed_dates.max(),
+            freq="D",
+        )
+        dates_without_observations = calendar_dates.difference(
+            observed_dates
+        ).sort_values()
+
+    return {
+        "row_count": len(df),
+        "order_count": int(df["order_id"].nunique()),
+        "missing_values_by_column": missing_values_by_column,
+        "missing_values_total": missing_values_total,
+        "duplicate_row_count": duplicate_row_count,
+        "negative_numeric_row_count": negative_numeric_row_count,
+        "price_units_discrepancy_count": price_units_discrepancy_count,
+        "date_min": date_min,
+        "date_max": date_max,
+        "dates_without_observations": dates_without_observations,
+    }
+
+
 def order_totals(df: DataFrame) -> DataFrame:
     """
     Return order_id and summed, unrounded revenue, sorted by revenue descending.
