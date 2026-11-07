@@ -242,7 +242,17 @@ def revenue_by_month(df: DataFrame)  -> DataFrame:
 
 
 def monthly_summary(df: DataFrame) -> DataFrame:
-    """Return chronological monthly revenue and order counts."""
+    """Return chronological monthly revenue, order counts, and daily coverage.
+
+    An order ID appearing in multiple months counts once in each month.
+    Observing every calendar date does not guarantee every transaction
+    was captured. Revenue per day is reported only for fully observed months.
+
+    Unobserved months within the range have zero counts and NaN financial
+    metrics. Empty input with required columns returns a typed empty table.
+    Invalid input raises ValueError. Dates are timezone-naive.
+    """
+
     required_cols = {"date", "order_id", "revenue"}
     missing_cols = required_cols - set(df.columns)
 
