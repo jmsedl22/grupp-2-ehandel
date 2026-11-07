@@ -20,6 +20,7 @@ from src.metrics import (
     get_order_range_boundaries,
     group_revenue,
     large_order_summary,
+    largest_orders,
     monthly_category_summary,
     monthly_summary,
     order_histogram,
@@ -1144,3 +1145,137 @@ def test_large_order_summary_validates_order_inputs(column, value):
 
     with pytest.raises(ValueError):
         large_order_summary(pd.DataFrame(data))
+
+@pytest.mark.parametrize("n", [2, np.int64(2)])
+def test_largest_orders_ranking_and_source_row_order(n):
+    df = pd.DataFrame({
+        "order_id": ["B", "A", "C", "A", "B", "D", "C"],
+        "revenue": ["40", "70", "30", "30", "60", "5", "20"],
+        "note": [
+            "b-first", "a-first", "c-first", "a-second",
+            "b-second", "d-first", "c-second",
+        ],
+    }, index=pd.Index([9, 2, 9, 1, 2, 2, 0], name="source_row"))
+    original = df.copy(deep=True)
+
+    result = largest_orders(df, n=n)
+
+    assert set(result) == {"orders", "rows"}
+
+    # A and B both total 100; A ranks first by order ID.
+    expected_orders = pd.DataFrame({
+        "rank": [1, 2],
+        "order_id": ["A", "B"],
+        "revenue": [100, 100],
+    })
+    pd.testing.assert_frame_equal(result["orders"], expected_orders)
+
+    # Preserve source values, duplicate index labels, and within-order order.
+    expected_rows = df.iloc[[1, 3, 0, 4]].copy()
+    expected_rows["order_rank"] = [1, 1, 2, 2]
+    expected_rows["order_revenue"] = [100, 100, 100, 100]
+
+    pd.testing.assert_frame_equal(result["rows"], expected_rows)
+    pd.testing.assert_frame_equal(df, original)
+
+
+def test_largest_orders_default_limit():
+    df = pd.DataFrame({
+        "order_id": ["F", "E", "D", "C", "B", "A"],
+        "revenue": [60, 50, 40, 30, 20, 10],
+    })
+
+    result = largest_orders(df)
+
+    assert result["orders"]["order_id"].tolist() == [
+        "F", "E", "D", "C", "B",
+    ]
+    assert result["orders"]["rank"].tolist() == [1, 2, 3, 4, 5]
+    assert len(result["rows"]) == 5
+
+
+def test_largest_orders_fewer_orders_than_requested():
+    df = pd.DataFrame({
+        "order_id": ["B", "A", "A"],
+        "revenue": [10.0, 4.0, 6.0],
+    })
+
+    result = largest_orders(df, n=10)
+
+    assert result["orders"]["order_id"].tolist() == ["A", "B"]
+    assert result["orders"]["rank"].tolist() == [1, 2]
+    assert result["orders"]["revenue"].tolist() == [10.0, 10.0]
+    assert result["rows"]["order_id"].tolist() == ["A", "A", "B"]
+    assert len(result["rows"]) == 3
+
+
+def test_largest_orders_empty_input():
+    df = pd.DataFrame(columns=["order_id", "revenue", "note"])
+
+    result = largest_orders(df)
+
+    assert set(result) == {"orders", "rows"}
+    assert result["orders"].empty
+    assert result["rows"].empty
+    assert list(result["orders"].columns) == ["rank", "order_id", "revenue"]
+    assert list(result["rows"].columns) == [
+        "order_id", "revenue", "note", "order_rank", "order_revenue",
+    ]
+    pd.testing.assert_frame_equal(
+        result["rows"][list(df.columns)],
+        df,
+    )
+
+
+@pytest.mark.parametrize("column", ["order_rank", "order_revenue"])
+@pytest.mark.parametrize("empty", [False, True])
+def test_largest_orders_rejects_metadata_collisions(column, empty):
+    df = pd.DataFrame({
+        "order_id": ["A"],
+        "revenue": [10.0],
+        column: [99],
+    })
+    if empty:
+        df = df.iloc[:0]
+
+    with pytest.raises(ValueError, match="Reserved metadata columns"):
+        largest_orders(df)
+
+
+@pytest.mark.parametrize("n", [0, -1, 1.5, "2", None, np.float64(2)])
+def test_largest_orders_rejects_invalid_n(n):
+    df = pd.DataFrame({
+        "order_id": ["A"],
+        "revenue": [10.0],
+    })
+
+    with pytest.raises(ValueError):
+        largest_orders(df, n=n)
+
+
+@pytest.mark.parametrize("columns", [[], ["order_id"], ["revenue"]])
+def test_largest_orders_rejects_missing_columns_even_when_empty(columns):
+    with pytest.raises(ValueError):
+        largest_orders(pd.DataFrame(columns=columns))
+
+
+@pytest.mark.parametrize(
+    "column, value",
+    [
+        ("order_id", None),
+        ("revenue", "not numeric"),
+        ("revenue", None),
+        ("revenue", np.nan),
+        ("revenue", np.inf),
+        ("revenue", -np.inf),
+    ],
+)
+def test_largest_orders_validates_order_inputs(column, value):
+    data = {
+        "order_id": ["A"],
+        "revenue": [10.0],
+    }
+    data[column] = [value]
+
+    with pytest.raises(ValueError):
+        largest_orders(pd.DataFrame(data))
