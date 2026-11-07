@@ -368,6 +368,65 @@ def large_order_summary(df: DataFrame) -> dict[str, float | int]:
     }
 
 
+def largest_orders(df: DataFrame, n: int = 5) -> dict[str, DataFrame]:
+    """Return the largest combined orders and rows.
+
+    The orders table contains rank, order_id, and combined revenue.
+    Revenue ties are resolved by ascending order ID, with consecutive ranks.
+
+    The rows table preserves every original column and value, followed by
+    order_rank and order_revenue. Rows are arranged by order rank while
+    preserving their original relative order within each order.
+
+    Require a positive integer n. Reject existing order_rank or
+    order_revenue columns. Empty input retains both tables' column schemas.
+    """
+    if not isinstance(n, (int, np.integer)) or n <= 0:
+        raise ValueError("n must be a positive integer")
+
+    metadata_cols = {"order_rank", "order_revenue"}
+    conflicting_cols = metadata_cols & set(df.columns)
+
+    if conflicting_cols:
+        raise ValueError(
+            f"Reserved metadata columns: {', '.join(sorted(conflicting_cols))}"
+        )
+
+    orders = order_totals(df)
+
+    selected_orders = (
+        orders.sort_values(
+            by=["revenue", "order_id"],
+            ascending=[False, True],
+        )
+        .head(int(n))
+        .copy()
+        .reset_index(drop=True)
+    )
+    selected_orders.insert(
+        0,
+        "rank",
+        range(1, len(selected_orders) + 1),
+    )
+
+    rows = df.loc[
+        df["order_id"].isin(selected_orders["order_id"])
+    ].copy()
+
+    lookup = selected_orders.set_index("order_id")
+    rows["order_rank"] = (
+        rows["order_id"].map(lookup["rank"]).astype("int64")
+    )
+    rows["order_revenue"] = rows["order_id"].map(lookup["revenue"])
+
+    rows = rows.sort_values(by="order_rank", kind="stable")
+
+    return {
+        "orders": selected_orders[["rank", "order_id", "revenue"]],
+        "rows": rows,
+    }
+
+
 # Return total revenue grouping by city
 def revenue_by_city(df: DataFrame) -> DataFrame:
     return group_revenue(df, "city")
