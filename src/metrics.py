@@ -117,6 +117,25 @@ def order_totals(df: DataFrame) -> DataFrame:
     return orders[['order_id', 'revenue']]
 
 
+def order_summary(df: DataFrame) -> dict[str, float]:
+    """
+    Return statistics for combined order revenues using linear quantile interpolation. Invalid input raises ValueError.
+    """
+    aov = calculate_aov(df)
+    distribution = calculate_order_value_distribution(df)
+    stats = calulate_descriptive_statistics(df)
+
+    return {
+        "aov": aov,
+        "median_revenue": distribution["median_revenue"],
+        "min_revenue": distribution["min_revenue"],
+        "max_revenue": distribution["max_revenue"],
+        "q1": stats.get("q1", float("nan")),
+        "q3": stats.get("q3", float("nan")),
+        "iqr": stats.get("iqr", float("nan")),
+    }
+
+
 # Return total revenue grouping by city
 def revenue_by_city(df: DataFrame) -> DataFrame:
     return group_revenue(df, "city")
@@ -308,7 +327,7 @@ def _calculate_order_boundaries(df: DataFrame) -> list[float]:
 
 
 # Calculate mode, quartiles and IRQ of order values
-def calulate_descriptive_statistics(df:DataFrame) -> dict:
+def calculate_descriptive_statistics(df:DataFrame) -> dict:
     orders = order_totals(df)
     values = orders["revenue"]
 
@@ -316,8 +335,8 @@ def calulate_descriptive_statistics(df:DataFrame) -> dict:
         return {}
 
     mode = values.mode().tolist()
-    q1 = values.quantile(0.25)
-    q3 = values.quantile(0.75)
+    q1 = values.quantile(0.25, interpolation="linear")
+    q3 = values.quantile(0.75, interpolation="linear")
     iqr = q3 - q1
 
     return {
