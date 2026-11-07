@@ -1,35 +1,35 @@
-
-import pandas as pd
 import numpy as np
+import pandas as pd
+from pandas import DataFrame
 
 
-# Calculate the average order value (AOV)
-def calculate_aov(df: pd.DataFrame)  -> float:
-    # Calculate total revenue and number of unique orders
-    total_revenue = calculate_total_revenue(df)
-    total_orders = count_orders(df)
-    
-    # Avoid division by zero
-    if total_orders == 0:                              
+def calculate_aov(df: DataFrame) -> float:
+    """
+    Calculates the average order value.
+    """
+    orders = order_totals(df)
+    number_of_orders = len(orders)
+
+    if number_of_orders <= 0:
         return 0.0
 
-    # Calculate AOV
-    aov = total_revenue / total_orders 
+    total_revenue = calculate_total_revenue(orders)
+    aov = total_revenue / number_of_orders
 
-    # Return the average revenue per order
     return float(aov)
 
+
 # Count unique orders
-def count_orders(df: pd.DataFrame) -> int:
+def count_orders(df: DataFrame) -> int:
     # Count district order IDs
-    count_orders = df["order_id"].nunique()      
-    
+    count_orders = df["order_id"].nunique()
+
     # Return the number of  unique orders
-    return int(count_orders)  
+    return int(count_orders)
 
 
-# Calculate total revenue 
-def calculate_total_revenue(df: pd.DataFrame) -> float:
+# Calculate total revenue
+def calculate_total_revenue(df: DataFrame) -> float:
     # Sum revenues values
     total_revenue = sum(df["revenue"])
 
@@ -37,13 +37,13 @@ def calculate_total_revenue(df: pd.DataFrame) -> float:
     return float(total_revenue)
 
 # Calculate total number of units sold
-def calculate_total_units(df: pd.DataFrame) -> int:
+def calculate_total_units(df: DataFrame) -> int:
     # Check for missing values
     if df["units"].isna().any():
-        raise ValueError("Units cannot contain missing value") 
+        raise ValueError("Units cannot contain missing value")
 
     # Covert units to numeric values
-    try: 
+    try:
         units = pd.to_numeric(df["units"], errors="raise")
 
     except (ValueError, TypeError) as exc:
@@ -53,7 +53,7 @@ def calculate_total_units(df: pd.DataFrame) -> int:
     if not np.isfinite(units).all():
         raise ValueError("Units must cotain finite values")
     if not (units % 1 == 0).all():
-        raise ValueError ("Units must cotain whole number")           
+        raise ValueError ("Units must cotain whole number")
 
     total_units = int(units.sum())
     # Return the total number of units sold
@@ -61,50 +61,398 @@ def calculate_total_units(df: pd.DataFrame) -> int:
 
 
 # Combine the results of the two previous functions
-def calculate_total_revenue_units(df: pd.DataFrame) -> tuple[float, int]:
-    
+def calculate_total_revenue_units(df: DataFrame) -> tuple[float, int]:
+
     # Return both results as a tuple
     return calculate_total_revenue(df), calculate_total_units(df)
 
 
 # Group revenue by a selected column
-def group_revenue(df: pd.DataFrame, group_by: str | pd.Grouper ) -> pd.DataFrame: 
+def group_revenue(df: DataFrame, group_by: str | pd.Grouper ) -> DataFrame:
 
     # Calculate total revenue for each group
-    group = df.groupby(group_by, as_index= False)["revenue"].sum()   
+    group = df.groupby(group_by, as_index= False)[["revenue"]].sum()
 
-    # Sort groups by total revenue in descending order   
-    group = group.sort_values(by="revenue", ascending=False)                
+    # Sort groups by total revenue in descending order
+    group = group.sort_values(by="revenue", ascending=False)
 
-    return group        
+    return group
+
+
+def _group_revenue_summary(df: DataFrame, group_by: str) -> DataFrame:
+    """
+    Return grouped revenue and percentage shares of total input revenue. Empty
+    input returns the same three columns. Zero total gives NaN shares. Raise
+    ValueError for missing required columns or invalid revenue.
+    """
+    required_cols = {group_by, 'revenue'}
+    missing_cols = required_cols - set(df.columns)
+
+    if missing_cols:
+        raise ValueError(
+            f"Missing required columns: {', '.join(sorted(missing_cols))}")
+
+    df_required = df[[group_by, "revenue"]].copy()
+    df_required[group_by] = df_required[group_by].astype(object)
+
+    try:
+        revenue = pd.to_numeric(df_required["revenue"], errors="raise")
+    except (ValueError, TypeError) as exc:
+        raise ValueError("Revenue must contain numeric values") from exc
+
+    if revenue.isna().to_numpy().any():
+        raise ValueError("Revenue cannot contain missing values")
+
+    if not np.isfinite(revenue.to_numpy(dtype=float)).all():
+        raise ValueError("Revenue must contain finite values")
+
+    df_required["revenue"] = revenue
+    total_revenue = revenue.sum()
+
+    groups = df_required.groupby(
+        group_by,
+        as_index=False,
+        dropna=False,
+        observed=True,
+    )[["revenue"]].sum()
+
+    if total_revenue == 0:
+        groups["share_pct"] = float("nan")
+    else:
+        groups["share_pct"] = groups["revenue"] / total_revenue * 100
+
+    groups = groups.sort_values(
+        by=["revenue", group_by],
+        ascending=[False, True],
+        na_position="last",
+    )
+
+    return groups[[group_by, "revenue", "share_pct"]]
+
+
+def category_summary(df: DataFrame) -> DataFrame:
+    """Return category revenue totals and percentage shares of all revenue."""
+    return _group_revenue_summary(df, "category")
+
+
+def city_summary(df: DataFrame) -> DataFrame:
+    """Return city, revenue and share_pct, with shares of total revenue."""
+    return _group_revenue_summary(df, "city")
+
+
+def top_categories_summary(df: DataFrame, n: int = 3) -> DataFrame:
+    """Return the top n categories with revenue shares."""
+    if (not isinstance(n, (int, np.integer)) or n <= 0):
+        raise ValueError("n must be a positive integer")
+
+    categories = category_summary(df)
+    return categories.head(int(n))
+
+
+def data_overview(df: DataFrame) -> dict[str, object]:
+    """Return data-quality counts, date bounds, and dates without observations.
+
+    Missing values and numeric infinities are allowed. Discrepancy checks
+    include only rows with present, finite price, units, and revenue values.
+    Missing-value and duplicate counts use the original input.
+
+    Invalid dates are excluded from date bounds and calendar coverage.
+    Dates without observations do not establish that sales were zero.
+    Empty input with required columns returns zero counts and no date range.
+    """
+    required_cols = {"date", "order_id", "price", "units", "revenue"}
+    missing_cols = required_cols - set(df.columns)
+
+    if missing_cols:
+        raise ValueError(
+            f"Missing required columns: {', '.join(sorted(missing_cols))}")
+
+    missing_values_by_column = {
+        column: int(count)
+        for column, count in df.isna().sum().items()
+    }
+    missing_values_total = sum(missing_values_by_column.values())
+    duplicate_row_count = int(df.duplicated().sum())
+
+    numeric = df[["price", "units", "revenue"]].copy()
+
+    for column in numeric.columns:
+        try:
+            numeric[column] = pd.to_numeric(numeric[column], errors="raise")
+        except (ValueError, TypeError) as exc:
+            raise ValueError(
+                f"{column} must contain numeric values"
+            ) from exc
+
+    negative_numeric_row_count = int(
+        numeric.lt(0).any(axis=1).sum()
+    )
+
+    numeric_values = numeric.to_numpy(dtype=float, na_value=np.nan)
+    valid_rows = np.isfinite(numeric_values).all(axis=1)
+    valid_values = numeric_values[valid_rows]
+
+    matches = np.isclose(
+        valid_values[:, 0] * valid_values[:, 1],
+        valid_values[:, 2],
+        atol=0.01,
+        rtol=0,
+    )
+    price_units_discrepancy_count = int((~matches).sum())
+
+    dates = pd.to_datetime(df["date"], errors="coerce")
+    valid_dates = dates.dropna()
+
+    if valid_dates.empty:
+        date_min = pd.NaT
+        date_max = pd.NaT
+        dates_without_observations = pd.DatetimeIndex([])
+    else:
+        date_min = valid_dates.min()
+        date_max = valid_dates.max()
+
+        observed_dates = pd.DatetimeIndex(
+            valid_dates.dt.normalize().unique()
+        )
+        calendar_dates = pd.date_range(
+            start=observed_dates.min(),
+            end=observed_dates.max(),
+            freq="D",
+        )
+        dates_without_observations = calendar_dates.difference(
+            observed_dates
+        ).sort_values()
+
+    return {
+        "row_count": len(df),
+        "order_count": int(df["order_id"].nunique()),
+        "missing_values_by_column": missing_values_by_column,
+        "missing_values_total": missing_values_total,
+        "duplicate_row_count": duplicate_row_count,
+        "negative_numeric_row_count": negative_numeric_row_count,
+        "price_units_discrepancy_count": price_units_discrepancy_count,
+        "date_min": date_min,
+        "date_max": date_max,
+        "dates_without_observations": dates_without_observations,
+    }
+
+
+def order_totals(df: DataFrame) -> DataFrame:
+    """
+    Return order_id and summed, unrounded revenue, sorted by revenue descending.
+    Raise ValueError for missing required columns, missing order IDs,
+    or non-numeric, missing, or infinite revenue. Negative revenue is allowed.
+    """
+    required_cols = {"order_id", "revenue"}
+    missing_cols = required_cols - set(df.columns)
+
+    if missing_cols:
+        raise ValueError(
+            f"Missing required columns: {', '.join(sorted(missing_cols))}")
+
+    df_required = df[["order_id", "revenue"]].copy()
+
+    if df_required[["order_id"]].isna().to_numpy().any():
+        raise ValueError("Order IDs cannot contain missing values")
+
+    try:
+        revenue = pd.to_numeric(df_required["revenue"], errors="raise")
+    except (ValueError, TypeError) as exc:
+        raise ValueError("Revenue must contain numeric values") from exc
+
+    if revenue.isna().to_numpy().any():
+        raise ValueError("Revenue cannot contain missing values")
+
+    if not np.isfinite(revenue.to_numpy(dtype=float)).all():
+        raise ValueError("Revenue must contain finite values")
+
+    df_required["revenue"] = revenue
+
+    if df_required.empty:
+        return df_required
+
+    orders = group_revenue(df_required, 'order_id')
+    return orders[['order_id', 'revenue']]
+
+
+def order_histogram(
+    df: DataFrame,
+    bins: int = 25,
+) -> dict[str, list[float] | list[int]]:
+    """Return histogram bin_edges and counts for combined orders.
+
+    Each bin includes its left boundary and excludes its right boundary,
+    (except the final bin). NumPy determines the range, expanding it
+    automatically for constant order revenues.
+    """
+    if (not isinstance(bins, (int, np.integer)) or bins <= 0):
+        raise ValueError("bins must be a positive integer")
+
+    orders = order_totals(df)
+
+    if orders.empty:
+        return {"bin_edges": [], "counts": []}
+
+    counts, edges = np.histogram(
+        orders["revenue"].to_numpy(),
+        bins=int(bins),
+    )
+
+    return {
+        "bin_edges": [float(edge) for edge in edges],
+        "counts": [int(count) for count in counts],
+    }
+
+
+def order_summary(df: DataFrame) -> dict[str, float]:
+    """
+    Return statistics for combined order revenues using linear quantile
+    interpolation. Invalid input raises ValueError. Empty input with required
+    columns still returns all seven keys.
+    """
+    aov = calculate_aov(df)
+    distribution = calculate_order_value_distribution(df)
+    stats = calculate_descriptive_statistics(df)
+
+    return {
+        "aov": aov,
+        "median_revenue": distribution["median_revenue"],
+        "min_revenue": distribution["min_revenue"],
+        "max_revenue": distribution["max_revenue"],
+        "q1": stats.get("q1", float("nan")),
+        "q3": stats.get("q3", float("nan")),
+        "iqr": stats.get("iqr", float("nan")),
+    }
+
+
+def large_order_summary(df: DataFrame) -> dict[str, float | int]:
+    """Summarize combined orders strictly above Q3 + 1.5 times IQR.
+
+    Empty input returns a NaN threshold and shares, zero orders, and
+    0.0 revenue. Revenue share is NaN when total order revenue is zero.
+    Constant order values produce no large orders.
+    """
+    orders = order_totals(df)
+
+    if orders.empty:
+        return {
+            "threshold": float("nan"),
+            "order_count": 0,
+            "order_share_pct": float("nan"),
+            "revenue": 0.0,
+            "revenue_share_pct": float("nan"),
+        }
+
+    stats = calculate_descriptive_statistics(df)
+    threshold = float(stats["q3"] + 1.5 * stats["iqr"])
+
+    large_orders = orders.loc[orders["revenue"] > threshold]
+
+    order_count = len(large_orders)
+    revenue = float(large_orders["revenue"].sum())
+    total_revenue = float(orders["revenue"].sum())
+
+    order_share_pct = float(order_count / len(orders) * 100)
+
+    if total_revenue == 0:
+        revenue_share_pct = float("nan")
+    else:
+        revenue_share_pct = float(revenue / total_revenue * 100)
+
+    return {
+        "threshold": threshold,
+        "order_count": order_count,
+        "order_share_pct": order_share_pct,
+        "revenue": revenue,
+        "revenue_share_pct": revenue_share_pct,
+    }
+
+
+def largest_orders(df: DataFrame, n: int = 5) -> dict[str, DataFrame]:
+    """Return the largest combined orders and rows.
+
+    The orders table contains rank, order_id, and combined revenue.
+    Revenue ties are resolved by ascending order ID, with consecutive ranks.
+
+    The rows table preserves every original column and value, followed by
+    order_rank and order_revenue. Rows are arranged by order rank while
+    preserving their original relative order within each order.
+
+    Require a positive integer n. Reject existing order_rank or
+    order_revenue columns. Empty input retains both tables' column schemas.
+    """
+    if not isinstance(n, (int, np.integer)) or n <= 0:
+        raise ValueError("n must be a positive integer")
+
+    metadata_cols = {"order_rank", "order_revenue"}
+    conflicting_cols = metadata_cols & set(df.columns)
+
+    if conflicting_cols:
+        raise ValueError(
+            f"Reserved metadata columns: {', '.join(sorted(conflicting_cols))}"
+        )
+
+    orders = order_totals(df)
+
+    selected_orders = (
+        orders.sort_values(
+            by=["revenue", "order_id"],
+            ascending=[False, True],
+        )
+        .head(int(n))
+        .copy()
+        .reset_index(drop=True)
+    )
+    selected_orders.insert(
+        0,
+        "rank",
+        range(1, len(selected_orders) + 1),
+    )
+
+    rows = df.loc[
+        df["order_id"].isin(selected_orders["order_id"])
+    ].copy()
+
+    lookup = selected_orders.set_index("order_id")
+    rows["order_rank"] = (
+        rows["order_id"].map(lookup["rank"]).astype("int64")
+    )
+    rows["order_revenue"] = rows["order_id"].map(lookup["revenue"])
+
+    rows = rows.sort_values(by="order_rank", kind="stable")
+
+    return {
+        "orders": selected_orders[["rank", "order_id", "revenue"]],
+        "rows": rows,
+    }
 
 
 # Return total revenue grouping by city
-def revenue_by_city(df: pd.DataFrame) -> pd.DataFrame:
+def revenue_by_city(df: DataFrame) -> DataFrame:
     return group_revenue(df, "city")
 
 
 # Return the three cities with highest revenue
-def revenue_top_3_cities(df: pd.DataFrame)  -> pd.DataFrame:
+def revenue_top_3_cities(df: DataFrame)  -> DataFrame:
     return group_revenue(df, "city").head(3)
 
 
 # Return total revenue grouping by category
-def revenue_by_category(df: pd.DataFrame)  -> pd.DataFrame:
+def revenue_by_category(df: DataFrame)  -> DataFrame:
     return group_revenue(df, "category")
 
 
 # Return the three categories with highest revenue
-def revenue_top_3_categories(df: pd.DataFrame)  -> pd.DataFrame:
+def revenue_top_3_categories(df: DataFrame)  -> DataFrame:
     return group_revenue(df, "category").head(3)
 
 
 # Group revenue by month
-def revenue_by_month(df: pd.DataFrame)  -> pd.DataFrame:
+def revenue_by_month(df: DataFrame)  -> DataFrame:
     # Group revenue by month using the date column
     group_month = group_revenue(
         df, pd.Grouper(key="date", freq="MS"))
-    
+
     # Sort month in chronological order
     group_month = group_month.sort_values(by="date")
 
@@ -114,13 +462,211 @@ def revenue_by_month(df: pd.DataFrame)  -> pd.DataFrame:
     return group_month
 
 
-# Group revenue by weekday 
-def revenue_by_weekday(df: pd.DataFrame)  -> pd.DataFrame:
+def monthly_summary(df: DataFrame) -> DataFrame:
+    """Return chronological monthly revenue, order counts, and daily coverage.
+
+    An order ID appearing in multiple months counts once in each month.
+    Observing every calendar date does not guarantee every transaction
+    was captured. Revenue per day is reported only for fully observed months.
+
+    Unobserved months within the range have zero counts and NaN financial
+    metrics. Empty input with required columns returns a typed empty table.
+    Invalid input raises ValueError. Dates are timezone-naive.
+    """
+
+    required_cols = {"date", "order_id", "revenue"}
+    missing_cols = required_cols - set(df.columns)
+
+    if missing_cols:
+        raise ValueError(
+            f"Missing required columns: {', '.join(sorted(missing_cols))}"
+        )
+
+    df_required = df[["date", "order_id", "revenue"]].copy()
+
+    if df_required["order_id"].isna().any():
+        raise ValueError("Order IDs cannot contain missing values")
+
+    try:
+        revenue = pd.to_numeric(df_required["revenue"], errors="raise")
+    except (ValueError, TypeError) as exc:
+        raise ValueError("Revenue must contain numeric values") from exc
+
+    if revenue.isna().any():
+        raise ValueError("Revenue cannot contain missing values")
+
+    if not np.isfinite(revenue.to_numpy(dtype=float)).all():
+        raise ValueError("Revenue must contain finite values")
+
+    df_required["revenue"] = revenue
+
+    try:
+        dates = pd.to_datetime(df_required["date"], errors="raise")
+    except (ValueError, TypeError, OverflowError) as exc:
+        raise ValueError("Dates must contain valid datetime values") from exc
+
+    if dates.isna().any():
+        raise ValueError("Dates cannot contain missing values")
+
+    df_required["date"] = dates
+
+    column_dtypes = {
+        "month": "datetime64[ns]",
+        "revenue": "float64",
+        "order_count": "int64",
+        "calendar_days": "int64",
+        "observed_days": "int64",
+        "coverage_status": "string",
+        "revenue_per_day": "float64",
+        "aov": "float64",
+    }
+
+    if df_required.empty:
+        return DataFrame({
+            column: pd.Series(dtype=dtype)
+            for column, dtype in column_dtypes.items()
+        })
+
+    df_required["observed_date"] = df_required["date"].dt.normalize()
+    df_required["month"] = (
+        df_required["date"].dt.to_period("M").dt.to_timestamp()
+    )
+
+    monthly = df_required.groupby("month").agg(
+        revenue=("revenue", "sum"),
+        order_count=("order_id", "nunique"),
+        observed_days=("observed_date", "nunique"),
+    )
+
+    months = pd.date_range(
+        start=monthly.index.min(),
+        end=monthly.index.max(),
+        freq="MS",
+        name="month",
+    )
+    monthly = monthly.reindex(months)
+
+    for column in ["order_count", "observed_days"]:
+        monthly[column] = monthly[column].fillna(0).astype("int64")
+
+    monthly["calendar_days"] = months.days_in_month
+
+    has_observations = monthly["observed_days"] > 0
+    all_days_observed = (
+        monthly["observed_days"] == monthly["calendar_days"]
+    )
+
+    monthly["coverage_status"] = pd.Series(
+        "no_observations",
+        index=monthly.index,
+        dtype="string",
+    )
+    monthly.loc[has_observations, "coverage_status"] = "partial"
+    monthly.loc[all_days_observed, "coverage_status"] = "all_days_observed"
+
+    monthly["revenue_per_day"] = (
+        monthly["revenue"] / monthly["calendar_days"]
+    ).where(all_days_observed)
+
+    positive_order_count = monthly["order_count"].where(
+        monthly["order_count"] > 0
+    )
+    monthly["aov"] = monthly["revenue"] / positive_order_count
+
+    return monthly.reset_index()[list(column_dtypes)]
+
+
+def monthly_category_summary(df: DataFrame) -> DataFrame:
+    """Return month, category and revenue in chronological order.
+
+    Observed categories share one monthly range, from the earliest
+    to the latest month across the entire input. Missing category labels
+    remain a separate group. NaN revenue means no observations for that
+    month/category combination.
+
+    Empty input with required columns returns a typed empty table.
+    Invalid input raises ValueError. Dates are expected to be timezone-naive.
+    """
+    required_cols = {"date", "category", "revenue"}
+    missing_cols = required_cols - set(df.columns)
+
+    if missing_cols:
+        raise ValueError(
+            f"Missing required columns: {', '.join(sorted(missing_cols))}")
+
+    df_required = df[["date", "category", "revenue"]].copy()
+    df_required["category"] = df_required["category"].astype(object)
+
+    try:
+        revenue = pd.to_numeric(df_required["revenue"], errors="raise")
+    except (ValueError, TypeError) as exc:
+        raise ValueError("Revenue must contain numeric values") from exc
+
+    if revenue.isna().any():
+        raise ValueError("Revenue cannot contain missing values")
+
+    if not np.isfinite(revenue.to_numpy(dtype=float)).all():
+        raise ValueError("Revenue must contain finite values")
+
+    df_required["revenue"] = revenue
+
+    try:
+        dates = pd.to_datetime(df_required["date"], errors="raise")
+    except (ValueError, TypeError, OverflowError) as exc:
+        raise ValueError("Dates must contain valid datetime values") from exc
+
+    if dates.isna().any():
+        raise ValueError("Dates cannot contain missing values")
+
+    df_required["date"] = dates
+
+    if df_required.empty:
+        return DataFrame({
+            "month": pd.Series(dtype="datetime64[ns]"),
+            "category": pd.Series(dtype=object),
+            "revenue": pd.Series(dtype="float64"),
+        })
+
+    df_required["month"] = (
+        df_required["date"].dt.to_period("M").dt.to_timestamp()
+    )
+
+    grouped = df_required.groupby(
+        ["month", "category"],
+        dropna=False,
+        observed=True,
+    )[["revenue"]].sum()
+
+    months = pd.date_range(
+        start=df_required["month"].min(),
+        end=df_required["month"].max(),
+        freq="MS",
+    )
+    categories = grouped.index.get_level_values("category").unique()
+
+    complete_index = pd.MultiIndex.from_product(
+        [months, categories],
+        names=["month", "category"],
+    )
+
+    result = grouped.reindex(complete_index).reset_index()
+    result = result.sort_values(
+        by=["month", "category"],
+        ascending=[True, True],
+        na_position="last",
+        ignore_index=True,
+    )
+
+    return result[["month", "category", "revenue"]]
+
+
+# Group revenue by weekday
+def revenue_by_weekday(df: DataFrame)  -> DataFrame:
 
     # Create a DataFrame grouped by weekday
     group_weekday = group_revenue(
         df.assign(weekday=df["date"].dt.dayofweek), "weekday")
-    
+
     # Sort weekdays in chronological order
     group_weekday = group_weekday.sort_values(by="weekday")
 
@@ -142,9 +688,9 @@ def revenue_by_weekday(df: pd.DataFrame)  -> pd.DataFrame:
 
 
 # Calculate minumum, maximum and median order reveneu
-def calculate_order_value_distribution(df: pd.DataFrame) -> dict[str, float]:
+def calculate_order_value_distribution(df: DataFrame) -> dict[str, float]:
     # Calculate total revenue for each order
-    orders_total_revenues = group_revenue(df, "order_id")
+    orders_total_revenues = order_totals(df)
 
     # Find the minimum order revenue
     min_revenue = orders_total_revenues["revenue"].min()
@@ -162,15 +708,15 @@ def calculate_order_value_distribution(df: pd.DataFrame) -> dict[str, float]:
 
 
 # Calculate revenue ranges for order distribution
-def calculate_order_ranges(df: pd.DataFrame) -> pd.DataFrame:
+def calculate_order_ranges(df: DataFrame) -> DataFrame:
     from_to = _calculate_order_boundaries(df)
 
     # Calculate total revenue for each order
-    orders = group_revenue(df, "order_id")
+    orders = order_totals(df)
 
     # Handle orders with identical revenue values
     if len(from_to) == 1:
-        return pd.DataFrame(
+        return DataFrame(
             {
                 "number of orders": [len(orders)],
                 "percentages": [100.0],
@@ -194,7 +740,7 @@ def calculate_order_ranges(df: pd.DataFrame) -> pd.DataFrame:
     count_procent = counts / len(orders)*100
 
     # Create a Data Frame with order counts and percentages
-    result = pd.DataFrame(
+    result = DataFrame(
         {
             "number of orders": counts,
             "percentages" :count_procent
@@ -204,9 +750,9 @@ def calculate_order_ranges(df: pd.DataFrame) -> pd.DataFrame:
     return result
 
 # Calculate standard deviation of order values
-def calculate_order_value_std(df: pd.DataFrame) -> float:
+def calculate_order_value_std(df: DataFrame) -> float:
     # Calculate total revenue for each order
-    order = group_revenue(df, "order_id")
+    order = order_totals(df)
 
     # Calculate standart deviation
     std = order["revenue"].std()
@@ -214,22 +760,22 @@ def calculate_order_value_std(df: pd.DataFrame) -> float:
     return float(std)
 
 
-def get_order_range_boundaries(df:pd.DataFrame) -> list[float]:
+def get_order_range_boundaries(df:DataFrame) -> list[float]:
     # return revenue range boundaries for plotting
     return _calculate_order_boundaries(df)
 
 
 # Calculate variance of order values
-def calculate_order_value_variance(df: pd.DataFrame) -> float:
+def calculate_order_value_variance(df: DataFrame) -> float:
     # Calculate total revenue for each order
-    orders = group_revenue(df, "order_id") 
+    orders = order_totals(df)
     variance = orders["revenue"].var()
 
     return float(variance)
 
 
 # Calculate and returns order revenue boundaries
-def _calculate_order_boundaries(df: pd.DataFrame) -> list[float]:
+def _calculate_order_boundaries(df: DataFrame) -> list[float]:
     # Get order revenue statistics
     stats = calculate_order_value_distribution(df)
 
@@ -240,7 +786,7 @@ def _calculate_order_boundaries(df: pd.DataFrame) -> list[float]:
 
     if min_revenue == max_revenue:
         return [float(min_revenue)]
-    
+
     # Find the smaller distance between the median and the revenues limits
     distance = min(
         median_revenue - min_revenue,
@@ -270,18 +816,18 @@ def _calculate_order_boundaries(df: pd.DataFrame) -> list[float]:
 
 
 # Calculate mode, quartiles and IRQ of order values
-def calulate_descriptive_statistics(df:pd.DataFrame) -> dict: 
-    orders = group_revenue(df, "order_id")
+def calculate_descriptive_statistics(df:DataFrame) -> dict:
+    orders = order_totals(df)
     values = orders["revenue"]
-    
+
     if values.empty:
         return {}
-    
+
     mode = values.mode().tolist()
-    q1 = values.quantile(0.25)
-    q3 = values.quantile(0.75)
+    q1 = values.quantile(0.25, interpolation="linear")
+    q3 = values.quantile(0.75, interpolation="linear")
     iqr = q3 - q1
-    
+
     return {
         "mode":[float(value) for value in mode],
         "q1": float(q1),
@@ -291,15 +837,15 @@ def calulate_descriptive_statistics(df:pd.DataFrame) -> dict:
 
 
 # Detect outliners in order values using the IQR methot
-def detect_outliers(df: pd.DataFrame) -> pd.DataFrame:
-    
-    orders = group_revenue(df, "order_id")
-    stats = calulate_descriptive_statistics(df)
-        
+def detect_outliers(df: DataFrame) -> DataFrame:
+
+    orders = order_totals(df)
+    stats = calculate_descriptive_statistics(df)
+
     if not stats:
         return orders
 
-    # Get quartiles and IQR from the stasistics dictionary    
+    # Get quartiles and IQR from the stasistics dictionary
     q1 = stats["q1"]
     q3 = stats["q3"]
     iqr = stats["iqr"]
@@ -308,15 +854,15 @@ def detect_outliers(df: pd.DataFrame) -> pd.DataFrame:
     lower_bound = q1 - 1.5 * iqr
     upper_bound = q3 + 1.5 * iqr
 
-    # Select orders outside the boundaries   
+    # Select orders outside the boundaries
     outliers = orders[
         (orders["revenue"] < lower_bound) | (orders["revenue"] > upper_bound)
     ]
 
     return outliers
 
-def calculate_order_z_scores(df: pd.DataFrame) -> pd.DataFrame:
-    orders = group_revenue(df, "order_id")
+def calculate_order_z_scores(df: DataFrame) -> DataFrame:
+    orders = order_totals(df)
 
     # Get order revenue values
     values = orders["revenue"]
@@ -324,8 +870,8 @@ def calculate_order_z_scores(df: pd.DataFrame) -> pd.DataFrame:
     if values.empty:
         orders["z_score"] = pd.Series(dtype=float)
         return orders
-        
-    
+
+
     mean = calculate_aov(df)
     std = calculate_order_value_std(df)
 
@@ -341,7 +887,22 @@ def calculate_order_z_scores(df: pd.DataFrame) -> pd.DataFrame:
 
 
 # Calculate the linear between units sold and revenue
-def calculate_units_revenue_correlation(df: pd.DataFrame) -> float:
+def calculate_units_revenue_correlation(df: DataFrame) -> float:
     correlation = df["units"].corr(df["revenue"])
 
     return float(correlation)
+
+
+# Calculate orders value, units per order, and summary statics
+def calculate_typical_order_data(df:pd.DataFrame) -> pd.DataFrame:
+    orders =df.groupby("order_id").agg(order_revenue=("revenue", "sum"),
+    order_units=("units", "sum")).reset_index()
+    
+
+    orders["median_revenue"] = calculate_order_value_distribution(df)["median_revenue"]
+    orders["median_units"] = orders["order_units"].median()
+    orders["average_revenue"] = calculate_aov(df)
+    orders["average_units"] = calculate_total_units(df)/count_orders(df)
+    unit_counts = (orders.groupby("order_units").size().reset_index(name="order_count"))
+    
+    return orders, unit_counts

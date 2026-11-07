@@ -4,26 +4,32 @@ import pytest
 
 from src.metrics import (
     calculate_aov,
+    calculate_descriptive_statistics,
     calculate_order_ranges,
     calculate_order_value_distribution,
     calculate_order_value_std,
     calculate_order_value_variance,
-    get_order_range_boundaries,
+    calculate_order_z_scores,
     calculate_total_revenue,
     calculate_total_revenue_units,
     calculate_total_units,
+    calculate_units_revenue_correlation,
     count_orders,
+    data_overview,
+    detect_outliers,
+    get_order_range_boundaries,
     group_revenue,
+    large_order_summary,
+    largest_orders,
+    monthly_category_summary,
+    monthly_summary,
+    order_histogram,
     revenue_by_category,
     revenue_by_city,
     revenue_by_month,
     revenue_by_weekday,
     revenue_top_3_categories,
     revenue_top_3_cities,
-    calulate_descriptive_statistics,
-    calculate_order_z_scores,
-    detect_outliers,
-    calculate_units_revenue_correlation,
 )
 
 
@@ -381,13 +387,13 @@ def test_calculate_order_value_variance_empty_dataframe():
     assert isinstance(result, float)
 
 
-def test_calulate_descriptive_statistics():
+def test_calculate_descriptive_statistics():
     df = pd.DataFrame({
         "order_id": [101, 102, 103, 104, 105],
         "revenue": [100, 200, 100, 200, 800]
     })
 
-    result = calulate_descriptive_statistics(df)
+    result = calculate_descriptive_statistics(df)
 
     assert result["mode"] == [100, 200]
     assert result["q1"] == 100
@@ -453,3 +459,823 @@ def test_calculate_units_revenue_correlation():
     assert isinstance(result_zero, (float, np.floating))
     assert isinstance(result_const, (float, np.floating))
     assert isinstance(result_empty, (float, np.floating))
+
+
+def test_monthly_summary_full_leap_month():
+    df = pd.DataFrame({
+        "date": pd.date_range("2024-02-01", "2024-02-29"),
+        "order_id": range(29),
+        "revenue": [10.0] * 29,
+    })
+
+    result = monthly_summary(df)
+    row = result.iloc[0]
+
+    assert list(result.columns) == [
+        "month",
+        "revenue",
+        "order_count",
+        "calendar_days",
+        "observed_days",
+        "coverage_status",
+        "revenue_per_day",
+        "aov",
+    ]
+    assert row["month"] == pd.Timestamp("2024-02-01")
+    assert row["revenue"] == pytest.approx(290.0)
+    assert row["order_count"] == 29
+    assert row["calendar_days"] == 29
+    assert row["observed_days"] == 29
+    assert row["coverage_status"] == "all_days_observed"
+    assert row["revenue_per_day"] == pytest.approx(10.0)
+    assert row["aov"] == pytest.approx(10.0)
+
+
+def test_monthly_summary_partial_and_missing_months():
+    df = pd.DataFrame({
+        "date": pd.to_datetime([
+            "2024-03-01 09:00:00",
+            "2024-01-31 15:00:00",
+            "2024-01-31 09:00:00",
+        ]),
+        "order_id": ["A", "A", "A"],
+        "revenue": ["0", "49.75", "100.25"],
+    })
+    original = df.copy(deep=True)
+
+    result = monthly_summary(df)
+
+    assert result["month"].tolist() == [
+        pd.Timestamp("2024-01-01"),
+        pd.Timestamp("2024-02-01"),
+        pd.Timestamp("2024-03-01"),
+    ]
+    assert result["calendar_days"].tolist() == [31, 29, 31]
+    assert result["order_count"].tolist() == [1, 0, 1]
+    assert result["observed_days"].tolist() == [1, 0, 1]
+    assert result["coverage_status"].tolist() == [
+        "partial", "no_observations", "partial",
+    ]
+    assert result["revenue_per_day"].isna().all()
+
+    january, february, march = [result.iloc[i] for i in range(3)]
+
+    assert january["revenue"] == pytest.approx(150.0)
+    assert january["aov"] == pytest.approx(150.0)
+
+    assert pd.isna(february["revenue"])
+    assert pd.isna(february["aov"])
+
+    # An observed zero is different from an unobserved month.
+    assert march["revenue"] == 0.0
+    assert march["aov"] == 0.0
+
+    pd.testing.assert_frame_equal(df, original)
+
+
+def test_monthly_summary_empty_input():
+    df = pd.DataFrame(columns=["date", "order_id", "revenue"])
+
+    result = monthly_summary(df)
+
+    assert result.empty
+    assert list(result.columns) == [
+        "month",
+        "revenue",
+        "order_count",
+        "calendar_days",
+        "observed_days",
+        "coverage_status",
+        "revenue_per_day",
+        "aov",
+    ]
+    assert pd.api.types.is_datetime64_any_dtype(result["month"])
+    assert pd.api.types.is_string_dtype(result["coverage_status"])
+
+    for column in ["order_count", "calendar_days", "observed_days"]:
+        assert pd.api.types.is_integer_dtype(result[column])
+
+    for column in ["revenue", "revenue_per_day", "aov"]:
+        assert pd.api.types.is_float_dtype(result[column])
+
+
+@pytest.mark.parametrize("column", ["date", "order_id", "revenue"])
+def test_monthly_summary_rejects_missing_columns_even_when_empty(column):
+    df = pd.DataFrame(columns=["date", "order_id", "revenue"])
+    df = df.drop(columns=[column])
+
+    with pytest.raises(ValueError):
+        monthly_summary(df)
+
+
+@pytest.mark.parametrize(
+    "column, value",
+    [
+        ("order_id", None),
+        ("revenue", "not numeric"),
+        ("revenue", None),
+        ("revenue", np.nan),
+        ("revenue", np.inf),
+        ("revenue", -np.inf),
+        ("date", "not a date"),
+        ("date", None),
+        ("date", pd.NaT),
+    ],
+)
+def test_monthly_summary_rejects_invalid_values(column, value):
+    data = {
+        "date": ["2024-01-01"],
+        "order_id": ["A"],
+        "revenue": [10.0],
+    }
+    data[column] = [value]
+
+    with pytest.raises(ValueError):
+        monthly_summary(pd.DataFrame(data))
+
+
+def test_monthly_category_summary_shared_range_and_observed_zero():
+    df = pd.DataFrame({
+        "date": ["2024-03-10", "2024-01-15", "2024-01-20"],
+        "category": ["Clothing", "Books", "Books"],
+        "revenue": ["300.75", "20.125", "-20.125"],
+    })
+    original = df.copy(deep=True)
+
+    result = monthly_category_summary(df)
+
+    assert list(result.columns) == ["month", "category", "revenue"]
+    assert pd.api.types.is_datetime64_any_dtype(result["month"])
+    assert result["month"].tolist() == [
+        pd.Timestamp("2024-01-01"),
+        pd.Timestamp("2024-01-01"),
+        pd.Timestamp("2024-02-01"),
+        pd.Timestamp("2024-02-01"),
+        pd.Timestamp("2024-03-01"),
+        pd.Timestamp("2024-03-01"),
+    ]
+    assert result["category"].tolist() == ["Books", "Clothing"] * 3
+
+    np.testing.assert_allclose(
+        result["revenue"].to_numpy(),
+        [0.0, np.nan, np.nan, np.nan, np.nan, 300.75],
+        equal_nan=True,
+    )
+    pd.testing.assert_frame_equal(df, original)
+
+
+def test_monthly_category_summary_categorical_and_missing_labels():
+    df = pd.DataFrame({
+        "date": [
+            "2024-01-01",
+            "2024-01-01",
+            "2024-01-01",
+            "2024-03-01",
+        ],
+        "category": pd.Categorical(
+            ["B", None, "A", None],
+            categories=["B", "A", "Unused"],
+            ordered=True,
+        ),
+        "revenue": [1.0, 2.0, 3.0, 4.0],
+    })
+    original = df.copy(deep=True)
+
+    result = monthly_category_summary(df)
+
+    # Only A, B, and the missing-label group appear in each month.
+    assert len(result) == 9
+    assert not isinstance(result["category"].dtype, pd.CategoricalDtype)
+
+    for month in pd.date_range("2024-01-01", "2024-03-01", freq="MS"):
+        rows = result.loc[result["month"] == month]
+
+        assert len(rows) == 3
+        assert rows["category"].iloc[:2].tolist() == ["A", "B"]
+        assert pd.isna(rows["category"].iloc[2])
+
+    np.testing.assert_allclose(
+        result["revenue"].to_numpy(),
+        [
+            3.0, 1.0, 2.0,
+            np.nan, np.nan, np.nan,
+            np.nan, np.nan, 4.0,
+        ],
+        equal_nan=True,
+    )
+    pd.testing.assert_frame_equal(df, original)
+
+
+def test_monthly_category_summary_empty_input():
+    df = pd.DataFrame(columns=["date", "category", "revenue"])
+
+    result = monthly_category_summary(df)
+
+    expected = pd.DataFrame({
+        "month": pd.Series(dtype="datetime64[ns]"),
+        "category": pd.Series(dtype=object),
+        "revenue": pd.Series(dtype="float64"),
+    })
+    pd.testing.assert_frame_equal(result, expected)
+
+
+@pytest.mark.parametrize("column", ["date", "category", "revenue"])
+@pytest.mark.parametrize("empty", [False, True])
+def test_monthly_category_summary_rejects_missing_columns(column, empty):
+    df = pd.DataFrame({
+        "date": ["2024-01-01"],
+        "category": ["Books"],
+        "revenue": [10.0],
+    })
+    if empty:
+        df = df.iloc[:0]
+
+    df = df.drop(columns=[column])
+
+    with pytest.raises(ValueError):
+        monthly_category_summary(df)
+
+
+@pytest.mark.parametrize(
+    "column, value",
+    [
+        ("revenue", "not numeric"),
+        ("revenue", None),
+        ("revenue", np.nan),
+        ("revenue", np.inf),
+        ("revenue", -np.inf),
+        ("date", "not a date"),
+        ("date", None),
+        ("date", pd.NaT),
+    ],
+)
+
+
+def test_monthly_category_summary_rejects_invalid_values(column, value):
+    data = {
+        "date": ["2024-01-01"],
+        "category": ["Books"],
+        "revenue": [10.0],
+    }
+    data[column] = [value]
+
+    with pytest.raises(ValueError):
+        monthly_category_summary(pd.DataFrame(data))
+
+@pytest.mark.parametrize("bins", [2, np.int64(2)])
+def test_order_histogram_combines_orders_and_handles_boundaries(bins):
+    df = pd.DataFrame({
+        "order_id": ["A", "A", "B", "C"],
+        "revenue": ["10", "20", "40", "50"],
+    })
+    original = df.copy(deep=True)
+
+    result = order_histogram(df, bins=bins)
+
+    # Combined revenues are 30, 40, and 50.
+    # 40 belongs to the second bin; the final boundary includes 50.
+    assert result == {
+        "bin_edges": [30.0, 40.0, 50.0],
+        "counts": [1, 2],
+    }
+    pd.testing.assert_frame_equal(df, original)
+
+
+def test_order_histogram_defaults_and_python_types():
+    df = pd.DataFrame({
+        "order_id": ["A", "B", "C"],
+        "revenue": [10.0, 20.0, 30.0],
+    })
+
+    result = order_histogram(df)
+
+    assert set(result) == {"bin_edges", "counts"}
+    assert len(result["bin_edges"]) == 26
+    assert len(result["counts"]) == 25
+    assert sum(result["counts"]) == 3
+    assert all(type(edge) is float for edge in result["bin_edges"])
+    assert all(type(count) is int for count in result["counts"])
+
+
+def test_order_histogram_constant_order_values():
+    df = pd.DataFrame({
+        "order_id": ["A", "A", "B"],
+        "revenue": [2.0, 5.0, 7.0],
+    })
+
+    result = order_histogram(df, bins=4)
+
+    # Both combined orders have revenue 7; NumPy expands the range.
+    assert result == {
+        "bin_edges": [6.5, 6.75, 7.0, 7.25, 7.5],
+        "counts": [0, 0, 2, 0],
+    }
+
+
+def test_order_histogram_negative_revenue_and_unrounded_edges():
+    df = pd.DataFrame({
+        "order_id": ["A", "B"],
+        "revenue": [-10.125, -3.375],
+    })
+
+    result = order_histogram(df, bins=1)
+
+    assert result == {
+        "bin_edges": [-10.125, -3.375],
+        "counts": [2],
+    }
+
+
+def test_order_histogram_empty_input():
+    df = pd.DataFrame(columns=["order_id", "revenue"])
+
+    assert order_histogram(df) == {"bin_edges": [], "counts": []}
+
+
+@pytest.mark.parametrize("columns", [[], ["order_id"], ["revenue"]])
+def test_order_histogram_rejects_missing_columns_even_when_empty(columns):
+    df = pd.DataFrame(columns=columns)
+
+    with pytest.raises(ValueError):
+        order_histogram(df)
+
+
+@pytest.mark.parametrize("bins", [0, -1, 2.5, "3", None, np.float64(3)])
+def test_order_histogram_rejects_invalid_bins(bins):
+    df = pd.DataFrame({
+        "order_id": ["A"],
+        "revenue": [10.0],
+    })
+
+    with pytest.raises(ValueError):
+        order_histogram(df, bins=bins)
+
+
+@pytest.mark.parametrize(
+    "column, value",
+    [
+        ("order_id", None),
+        ("revenue", "not numeric"),
+        ("revenue", None),
+        ("revenue", np.nan),
+        ("revenue", np.inf),
+        ("revenue", -np.inf),
+    ],
+)
+def test_order_histogram_validates_order_inputs(column, value):
+    data = {
+        "order_id": ["A"],
+        "revenue": [10.0],
+    }
+    data[column] = [value]
+
+    with pytest.raises(ValueError):
+        order_histogram(pd.DataFrame(data))
+
+def test_data_overview_counts_dates_and_preserves_input():
+    df = pd.DataFrame({
+        "date": [
+            "2024-01-01 09:00:00",
+            "2024-01-01 09:00:00",
+            "2024-01-01 18:00:00",
+            "2024-01-03 12:00:00",
+            "not-a-date",
+            None,
+        ],
+        "order_id": ["A", "A", "A", "B", None, "C"],
+        "price": [10.0, 10.0, 5.0, None, -2.0, np.inf],
+        "units": [2, 2, 1, 2, -3, 1],
+        "revenue": [20.0, 20.0, 5.0, None, 6.0, 10.0],
+        "extra": ["x", "x", None, "y", "z", None],
+    })
+    original = df.copy(deep=True)
+
+    result = data_overview(df)
+
+    expected_counts = {
+        "row_count": 6,
+        "order_count": 3,
+        "missing_values_total": 6,
+        "duplicate_row_count": 1,
+        "negative_numeric_row_count": 1,
+        "price_units_discrepancy_count": 0,
+    }
+    assert set(result) == set(expected_counts) | {
+        "missing_values_by_column",
+        "date_min",
+        "date_max",
+        "dates_without_observations",
+    }
+
+    for key, expected in expected_counts.items():
+        assert result[key] == expected
+        assert type(result[key]) is int
+
+    missing = result["missing_values_by_column"]
+    assert isinstance(missing, dict)
+    assert missing == {
+        "date": 1,
+        "order_id": 1,
+        "price": 1,
+        "units": 0,
+        "revenue": 1,
+        "extra": 2,
+    }
+    assert all(type(count) is int for count in missing.values())
+
+    assert result["date_min"] == pd.Timestamp("2024-01-01 09:00:00")
+    assert result["date_max"] == pd.Timestamp("2024-01-03 12:00:00")
+
+    absent_dates = result["dates_without_observations"]
+    assert isinstance(absent_dates, pd.DatetimeIndex)
+    assert absent_dates.tolist() == [pd.Timestamp("2024-01-02")]
+
+    pd.testing.assert_frame_equal(df, original)
+
+
+def test_data_overview_discrepancy_tolerance_and_excluded_rows():
+    df = pd.DataFrame({
+        "date": ["2024-01-01"] * 7,
+        "order_id": list(range(7)),
+        "price": ["2", "2", "1000000", None, "inf", "-inf", "2"],
+        "units": ["3", "3", "1", "3", "1", "1", None],
+        "revenue": ["6.005", "6.02", "1000001", "9", "0", "0", "6"],
+    })
+
+    result = data_overview(df)
+
+    # 6.005 is within tolerance; 6.02 and 1000001 are discrepancies.
+    # Rows containing missing or infinite numeric values are excluded.
+    assert result["price_units_discrepancy_count"] == 2
+    assert result["negative_numeric_row_count"] == 1
+
+
+def test_data_overview_empty_input():
+    df = pd.DataFrame(columns=[
+        "date", "order_id", "price", "units", "revenue", "extra",
+    ])
+
+    result = data_overview(df)
+
+    for key in [
+        "row_count",
+        "order_count",
+        "missing_values_total",
+        "duplicate_row_count",
+        "negative_numeric_row_count",
+        "price_units_discrepancy_count",
+    ]:
+        assert result[key] == 0
+        assert type(result[key]) is int
+
+    assert result["missing_values_by_column"] == {
+        column: 0 for column in df.columns
+    }
+    assert result["date_min"] is pd.NaT
+    assert result["date_max"] is pd.NaT
+
+    absent_dates = result["dates_without_observations"]
+    assert isinstance(absent_dates, pd.DatetimeIndex)
+    assert absent_dates.empty
+
+
+def test_data_overview_without_valid_dates():
+    df = pd.DataFrame({
+        "date": [None, "not-a-date"],
+        "order_id": ["A", "B"],
+        "price": [2.0, 3.0],
+        "units": [1, 1],
+        "revenue": [2.0, 3.0],
+    })
+
+    result = data_overview(df)
+
+    assert result["date_min"] is pd.NaT
+    assert result["date_max"] is pd.NaT
+
+    # The invalid string is not missing in the original input.
+    missing = result["missing_values_by_column"]
+    assert isinstance(missing, dict)
+    assert missing["date"] == 1
+    assert result["missing_values_total"] == 1
+
+    absent_dates = result["dates_without_observations"]
+    assert isinstance(absent_dates, pd.DatetimeIndex)
+    assert absent_dates.empty
+
+
+@pytest.mark.parametrize(
+    "column", ["date", "order_id", "price", "units", "revenue"]
+)
+@pytest.mark.parametrize("empty", [False, True])
+def test_data_overview_rejects_missing_columns(column, empty):
+    df = pd.DataFrame({
+        "date": ["2024-01-01"],
+        "order_id": ["A"],
+        "price": [2.0],
+        "units": [3],
+        "revenue": [6.0],
+    })
+    if empty:
+        df = df.iloc[:0]
+
+    with pytest.raises(ValueError):
+        data_overview(df.drop(columns=[column]))
+
+
+@pytest.mark.parametrize("column", ["price", "units", "revenue"])
+def test_data_overview_rejects_nonnumeric_values(column):
+    data = {
+        "date": ["2024-01-01"],
+        "order_id": ["A"],
+        "price": [2.0],
+        "units": [3],
+        "revenue": [6.0],
+    }
+    data[column] = ["not numeric"]
+
+    with pytest.raises(ValueError):
+        data_overview(pd.DataFrame(data))
+
+def test_large_order_summary_combines_orders_and_excludes_threshold_values():
+    df = pd.DataFrame({
+        "order_id": ["A", "B", "C", "D", "E", "E"],
+        "revenue": ["10", "10", "10", "10", "40", "60"],
+    })
+    original = df.copy(deep=True)
+
+    result = large_order_summary(df)
+
+    # Combined orders: 10, 10, 10, 10, 100.
+    # Q3 = 10 and IQR = 0, so only the order worth 100 qualifies.
+    assert set(result) == {
+        "threshold",
+        "order_count",
+        "order_share_pct",
+        "revenue",
+        "revenue_share_pct",
+    }
+    assert result["threshold"] == pytest.approx(10.0)
+    assert result["order_count"] == 1
+    assert result["order_share_pct"] == pytest.approx(20.0)
+    assert result["revenue"] == pytest.approx(100.0)
+    assert result["revenue_share_pct"] == pytest.approx(100 / 140 * 100)
+
+    assert type(result["order_count"]) is int
+    for key in [
+        "threshold", "order_share_pct", "revenue", "revenue_share_pct",
+    ]:
+        assert type(result[key]) is float
+
+    pd.testing.assert_frame_equal(df, original)
+
+
+def test_large_order_summary_uses_unrounded_threshold():
+    df = pd.DataFrame({
+        "order_id": ["A", "B", "C", "D", "E"],
+        "revenue": [1.0, 1.001, 2.0, 2.0032, 3.507],
+    })
+
+    result = large_order_summary(df)
+
+    # Rounding the threshold to 3.51 before selection would exclude E.
+    assert result["threshold"] == pytest.approx(3.5065)
+    assert result["order_count"] == 1
+    assert result["revenue"] == pytest.approx(3.507)
+
+
+@pytest.mark.parametrize("revenue", [0.0, 25.0, -10.0])
+def test_large_order_summary_constant_values(revenue):
+    df = pd.DataFrame({
+        "order_id": ["A", "B", "C", "D"],
+        "revenue": [revenue] * 4,
+    })
+
+    result = large_order_summary(df)
+
+    assert result["threshold"] == pytest.approx(revenue)
+    assert result["order_count"] == 0
+    assert result["order_share_pct"] == 0.0
+    assert result["revenue"] == 0.0
+
+    if revenue == 0:
+        assert pd.isna(result["revenue_share_pct"])
+    else:
+        assert result["revenue_share_pct"] == 0.0
+
+
+def test_large_order_summary_excludes_lower_outliers():
+    df = pd.DataFrame({
+        "order_id": ["A", "B", "C", "D", "E"],
+        "revenue": [-100.0, 10.0, 10.0, 10.0, 10.0],
+    })
+
+    result = large_order_summary(df)
+
+    assert result["threshold"] == pytest.approx(10.0)
+    assert result["order_count"] == 0
+    assert result["order_share_pct"] == 0.0
+    assert result["revenue"] == 0.0
+    assert result["revenue_share_pct"] == 0.0
+
+
+def test_large_order_summary_zero_total_with_large_order():
+    df = pd.DataFrame({
+        "order_id": ["A", "B", "C", "D", "E"],
+        "revenue": [-10.0, -10.0, -10.0, -10.0, 40.0],
+    })
+
+    result = large_order_summary(df)
+
+    assert result["threshold"] == pytest.approx(-10.0)
+    assert result["order_count"] == 1
+    assert result["order_share_pct"] == pytest.approx(20.0)
+    assert result["revenue"] == pytest.approx(40.0)
+    assert pd.isna(result["revenue_share_pct"])
+
+
+def test_large_order_summary_empty_input():
+    df = pd.DataFrame(columns=["order_id", "revenue"])
+
+    result = large_order_summary(df)
+
+    assert set(result) == {
+        "threshold",
+        "order_count",
+        "order_share_pct",
+        "revenue",
+        "revenue_share_pct",
+    }
+    assert pd.isna(result["threshold"])
+    assert result["order_count"] == 0
+    assert type(result["order_count"]) is int
+    assert pd.isna(result["order_share_pct"])
+    assert result["revenue"] == 0.0
+    assert pd.isna(result["revenue_share_pct"])
+
+    for key in [
+        "threshold", "order_share_pct", "revenue", "revenue_share_pct",
+    ]:
+        assert type(result[key]) is float
+
+
+@pytest.mark.parametrize("columns", [[], ["order_id"], ["revenue"]])
+def test_large_order_summary_rejects_missing_columns_even_when_empty(columns):
+    with pytest.raises(ValueError):
+        large_order_summary(pd.DataFrame(columns=columns))
+
+
+@pytest.mark.parametrize(
+    "column, value",
+    [
+        ("order_id", None),
+        ("revenue", "not numeric"),
+        ("revenue", None),
+        ("revenue", np.nan),
+        ("revenue", np.inf),
+        ("revenue", -np.inf),
+    ],
+)
+def test_large_order_summary_validates_order_inputs(column, value):
+    data = {
+        "order_id": ["A"],
+        "revenue": [10.0],
+    }
+    data[column] = [value]
+
+    with pytest.raises(ValueError):
+        large_order_summary(pd.DataFrame(data))
+
+@pytest.mark.parametrize("n", [2, np.int64(2)])
+def test_largest_orders_ranking_and_source_row_order(n):
+    df = pd.DataFrame({
+        "order_id": ["B", "A", "C", "A", "B", "D", "C"],
+        "revenue": ["40", "70", "30", "30", "60", "5", "20"],
+        "note": [
+            "b-first", "a-first", "c-first", "a-second",
+            "b-second", "d-first", "c-second",
+        ],
+    }, index=pd.Index([9, 2, 9, 1, 2, 2, 0], name="source_row"))
+    original = df.copy(deep=True)
+
+    result = largest_orders(df, n=n)
+
+    assert set(result) == {"orders", "rows"}
+
+    # A and B both total 100; A ranks first by order ID.
+    expected_orders = pd.DataFrame({
+        "rank": [1, 2],
+        "order_id": ["A", "B"],
+        "revenue": [100, 100],
+    })
+    pd.testing.assert_frame_equal(result["orders"], expected_orders)
+
+    # Preserve source values, duplicate index labels, and within-order order.
+    expected_rows = df.iloc[[1, 3, 0, 4]].copy()
+    expected_rows["order_rank"] = [1, 1, 2, 2]
+    expected_rows["order_revenue"] = [100, 100, 100, 100]
+
+    pd.testing.assert_frame_equal(result["rows"], expected_rows)
+    pd.testing.assert_frame_equal(df, original)
+
+
+def test_largest_orders_default_limit():
+    df = pd.DataFrame({
+        "order_id": ["F", "E", "D", "C", "B", "A"],
+        "revenue": [60, 50, 40, 30, 20, 10],
+    })
+
+    result = largest_orders(df)
+
+    assert result["orders"]["order_id"].tolist() == [
+        "F", "E", "D", "C", "B",
+    ]
+    assert result["orders"]["rank"].tolist() == [1, 2, 3, 4, 5]
+    assert len(result["rows"]) == 5
+
+
+def test_largest_orders_fewer_orders_than_requested():
+    df = pd.DataFrame({
+        "order_id": ["B", "A", "A"],
+        "revenue": [10.0, 4.0, 6.0],
+    })
+
+    result = largest_orders(df, n=10)
+
+    assert result["orders"]["order_id"].tolist() == ["A", "B"]
+    assert result["orders"]["rank"].tolist() == [1, 2]
+    assert result["orders"]["revenue"].tolist() == [10.0, 10.0]
+    assert result["rows"]["order_id"].tolist() == ["A", "A", "B"]
+    assert len(result["rows"]) == 3
+
+
+def test_largest_orders_empty_input():
+    df = pd.DataFrame(columns=["order_id", "revenue", "note"])
+
+    result = largest_orders(df)
+
+    assert set(result) == {"orders", "rows"}
+    assert result["orders"].empty
+    assert result["rows"].empty
+    assert list(result["orders"].columns) == ["rank", "order_id", "revenue"]
+    assert list(result["rows"].columns) == [
+        "order_id", "revenue", "note", "order_rank", "order_revenue",
+    ]
+    pd.testing.assert_frame_equal(
+        result["rows"][list(df.columns)],
+        df,
+    )
+
+
+@pytest.mark.parametrize("column", ["order_rank", "order_revenue"])
+@pytest.mark.parametrize("empty", [False, True])
+def test_largest_orders_rejects_metadata_collisions(column, empty):
+    df = pd.DataFrame({
+        "order_id": ["A"],
+        "revenue": [10.0],
+        column: [99],
+    })
+    if empty:
+        df = df.iloc[:0]
+
+    with pytest.raises(ValueError, match="Reserved metadata columns"):
+        largest_orders(df)
+
+
+@pytest.mark.parametrize("n", [0, -1, 1.5, "2", None, np.float64(2)])
+def test_largest_orders_rejects_invalid_n(n):
+    df = pd.DataFrame({
+        "order_id": ["A"],
+        "revenue": [10.0],
+    })
+
+    with pytest.raises(ValueError):
+        largest_orders(df, n=n)
+
+
+@pytest.mark.parametrize("columns", [[], ["order_id"], ["revenue"]])
+def test_largest_orders_rejects_missing_columns_even_when_empty(columns):
+    with pytest.raises(ValueError):
+        largest_orders(pd.DataFrame(columns=columns))
+
+
+@pytest.mark.parametrize(
+    "column, value",
+    [
+        ("order_id", None),
+        ("revenue", "not numeric"),
+        ("revenue", None),
+        ("revenue", np.nan),
+        ("revenue", np.inf),
+        ("revenue", -np.inf),
+    ],
+)
+def test_largest_orders_validates_order_inputs(column, value):
+    data = {
+        "order_id": ["A"],
+        "revenue": [10.0],
+    }
+    data[column] = [value]
+
+    with pytest.raises(ValueError):
+        largest_orders(pd.DataFrame(data))

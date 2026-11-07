@@ -59,6 +59,7 @@ notebook_shim==0.2.4
 numpy==2.5.4
 packaging==26.3
 pandas==3.0.6
+pandas-stubs==3.1.0.261029
 pandocfilters==1.5.1
 parso==0.8.7
 pillow==12.3.0
