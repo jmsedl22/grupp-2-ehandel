@@ -19,6 +19,7 @@ from src.metrics import (
     detect_outliers,
     get_order_range_boundaries,
     group_revenue,
+    large_order_summary,
     monthly_category_summary,
     monthly_summary,
     order_histogram,
@@ -994,3 +995,152 @@ def test_data_overview_rejects_nonnumeric_values(column):
 
     with pytest.raises(ValueError):
         data_overview(pd.DataFrame(data))
+
+def test_large_order_summary_combines_orders_and_excludes_threshold_values():
+    df = pd.DataFrame({
+        "order_id": ["A", "B", "C", "D", "E", "E"],
+        "revenue": ["10", "10", "10", "10", "40", "60"],
+    })
+    original = df.copy(deep=True)
+
+    result = large_order_summary(df)
+
+    # Combined orders: 10, 10, 10, 10, 100.
+    # Q3 = 10 and IQR = 0, so only the order worth 100 qualifies.
+    assert set(result) == {
+        "threshold",
+        "order_count",
+        "order_share_pct",
+        "revenue",
+        "revenue_share_pct",
+    }
+    assert result["threshold"] == pytest.approx(10.0)
+    assert result["order_count"] == 1
+    assert result["order_share_pct"] == pytest.approx(20.0)
+    assert result["revenue"] == pytest.approx(100.0)
+    assert result["revenue_share_pct"] == pytest.approx(100 / 140 * 100)
+
+    assert type(result["order_count"]) is int
+    for key in [
+        "threshold", "order_share_pct", "revenue", "revenue_share_pct",
+    ]:
+        assert type(result[key]) is float
+
+    pd.testing.assert_frame_equal(df, original)
+
+
+def test_large_order_summary_uses_unrounded_threshold():
+    df = pd.DataFrame({
+        "order_id": ["A", "B", "C", "D", "E"],
+        "revenue": [1.0, 1.001, 2.0, 2.0032, 3.507],
+    })
+
+    result = large_order_summary(df)
+
+    # Rounding the threshold to 3.51 before selection would exclude E.
+    assert result["threshold"] == pytest.approx(3.5065)
+    assert result["order_count"] == 1
+    assert result["revenue"] == pytest.approx(3.507)
+
+
+@pytest.mark.parametrize("revenue", [0.0, 25.0, -10.0])
+def test_large_order_summary_constant_values(revenue):
+    df = pd.DataFrame({
+        "order_id": ["A", "B", "C", "D"],
+        "revenue": [revenue] * 4,
+    })
+
+    result = large_order_summary(df)
+
+    assert result["threshold"] == pytest.approx(revenue)
+    assert result["order_count"] == 0
+    assert result["order_share_pct"] == 0.0
+    assert result["revenue"] == 0.0
+
+    if revenue == 0:
+        assert pd.isna(result["revenue_share_pct"])
+    else:
+        assert result["revenue_share_pct"] == 0.0
+
+
+def test_large_order_summary_excludes_lower_outliers():
+    df = pd.DataFrame({
+        "order_id": ["A", "B", "C", "D", "E"],
+        "revenue": [-100.0, 10.0, 10.0, 10.0, 10.0],
+    })
+
+    result = large_order_summary(df)
+
+    assert result["threshold"] == pytest.approx(10.0)
+    assert result["order_count"] == 0
+    assert result["order_share_pct"] == 0.0
+    assert result["revenue"] == 0.0
+    assert result["revenue_share_pct"] == 0.0
+
+
+def test_large_order_summary_zero_total_with_large_order():
+    df = pd.DataFrame({
+        "order_id": ["A", "B", "C", "D", "E"],
+        "revenue": [-10.0, -10.0, -10.0, -10.0, 40.0],
+    })
+
+    result = large_order_summary(df)
+
+    assert result["threshold"] == pytest.approx(-10.0)
+    assert result["order_count"] == 1
+    assert result["order_share_pct"] == pytest.approx(20.0)
+    assert result["revenue"] == pytest.approx(40.0)
+    assert pd.isna(result["revenue_share_pct"])
+
+
+def test_large_order_summary_empty_input():
+    df = pd.DataFrame(columns=["order_id", "revenue"])
+
+    result = large_order_summary(df)
+
+    assert set(result) == {
+        "threshold",
+        "order_count",
+        "order_share_pct",
+        "revenue",
+        "revenue_share_pct",
+    }
+    assert pd.isna(result["threshold"])
+    assert result["order_count"] == 0
+    assert type(result["order_count"]) is int
+    assert pd.isna(result["order_share_pct"])
+    assert result["revenue"] == 0.0
+    assert pd.isna(result["revenue_share_pct"])
+
+    for key in [
+        "threshold", "order_share_pct", "revenue", "revenue_share_pct",
+    ]:
+        assert type(result[key]) is float
+
+
+@pytest.mark.parametrize("columns", [[], ["order_id"], ["revenue"]])
+def test_large_order_summary_rejects_missing_columns_even_when_empty(columns):
+    with pytest.raises(ValueError):
+        large_order_summary(pd.DataFrame(columns=columns))
+
+
+@pytest.mark.parametrize(
+    "column, value",
+    [
+        ("order_id", None),
+        ("revenue", "not numeric"),
+        ("revenue", None),
+        ("revenue", np.nan),
+        ("revenue", np.inf),
+        ("revenue", -np.inf),
+    ],
+)
+def test_large_order_summary_validates_order_inputs(column, value):
+    data = {
+        "order_id": ["A"],
+        "revenue": [10.0],
+    }
+    data[column] = [value]
+
+    with pytest.raises(ValueError):
+        large_order_summary(pd.DataFrame(data))
