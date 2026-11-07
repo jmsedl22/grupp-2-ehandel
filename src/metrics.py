@@ -1,4 +1,3 @@
-
 import pandas as pd
 import numpy as np
 
@@ -8,13 +7,13 @@ def calculate_aov(df: pd.DataFrame)  -> float:
     # Calculate total revenue and number of unique orders
     total_revenue = calculate_total_revenue(df)
     total_orders = count_orders(df)
-    
+
     # Avoid division by zero
-    if total_orders == 0:                              
+    if total_orders == 0:
         return 0.0
 
     # Calculate AOV
-    aov = total_revenue / total_orders 
+    aov = total_revenue / total_orders
 
     # Return the average revenue per order
     return float(aov)
@@ -22,13 +21,13 @@ def calculate_aov(df: pd.DataFrame)  -> float:
 # Count unique orders
 def count_orders(df: pd.DataFrame) -> int:
     # Count district order IDs
-    count_orders = df["order_id"].nunique()      
-    
+    count_orders = df["order_id"].nunique()
+
     # Return the number of  unique orders
-    return int(count_orders)  
+    return int(count_orders)
 
 
-# Calculate total revenue 
+# Calculate total revenue
 def calculate_total_revenue(df: pd.DataFrame) -> float:
     # Sum revenues values
     total_revenue = sum(df["revenue"])
@@ -40,10 +39,10 @@ def calculate_total_revenue(df: pd.DataFrame) -> float:
 def calculate_total_units(df: pd.DataFrame) -> int:
     # Check for missing values
     if df["units"].isna().any():
-        raise ValueError("Units cannot contain missing value") 
+        raise ValueError("Units cannot contain missing value")
 
     # Covert units to numeric values
-    try: 
+    try:
         units = pd.to_numeric(df["units"], errors="raise")
 
     except (ValueError, TypeError) as exc:
@@ -53,7 +52,7 @@ def calculate_total_units(df: pd.DataFrame) -> int:
     if not np.isfinite(units).all():
         raise ValueError("Units must cotain finite values")
     if not (units % 1 == 0).all():
-        raise ValueError ("Units must cotain whole number")           
+        raise ValueError ("Units must cotain whole number")
 
     total_units = int(units.sum())
     # Return the total number of units sold
@@ -62,21 +61,59 @@ def calculate_total_units(df: pd.DataFrame) -> int:
 
 # Combine the results of the two previous functions
 def calculate_total_revenue_units(df: pd.DataFrame) -> tuple[float, int]:
-    
+
     # Return both results as a tuple
     return calculate_total_revenue(df), calculate_total_units(df)
 
 
 # Group revenue by a selected column
-def group_revenue(df: pd.DataFrame, group_by: str | pd.Grouper ) -> pd.DataFrame: 
+def group_revenue(df: pd.DataFrame, group_by: str | pd.Grouper ) -> pd.DataFrame:
 
     # Calculate total revenue for each group
-    group = df.groupby(group_by, as_index= False)["revenue"].sum()   
+    group = df.groupby(group_by, as_index= False)["revenue"].sum()
 
-    # Sort groups by total revenue in descending order   
-    group = group.sort_values(by="revenue", ascending=False)                
+    # Sort groups by total revenue in descending order
+    group = group.sort_values(by="revenue", ascending=False)
 
-    return group        
+    return group
+
+
+def order_totals(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Return order_id and summed, unrounded revenue, sorted by revenue descending.
+    Raise ValueError for missing required columns, missing order IDs,
+    or non-numeric, missing, or infinite revenue. Negative revenue is allowed.
+    """
+    required_cols = {"order_id", "revenue"}
+    missing_cols = required_cols - set(df.columns)
+
+    if missing_cols:
+        raise ValueError(
+            f"Missing required columns: {', '.join(sorted(missing_cols))}")
+
+    df_required = df[["order_id", "revenue"]].copy()
+
+    if df_required[["order_id"]].isna().to_numpy().any():
+        raise ValueError("Order IDs cannot contain missing values")
+
+    try:
+        revenue = pd.to_numeric(df_required["revenue"], errors="raise")
+    except (ValueError, TypeError) as exc:
+        raise ValueError("Revenue must contain numeric values") from exc
+
+    if revenue.isna().to_numpy().any():
+        raise ValueError("Revenue cannot contain missing values")
+
+    if not np.isfinite(revenue.to_numpy(dtype=float)).all():
+        raise ValueError("Revenue must contain finite values")
+
+    df_required["revenue"] = revenue
+
+    if df_required.empty:
+        return df_required
+
+    orders = group_revenue(df_required, 'order_id')
+    return orders[['order_id', 'revenue']]
 
 
 # Return total revenue grouping by city
@@ -104,7 +141,7 @@ def revenue_by_month(df: pd.DataFrame)  -> pd.DataFrame:
     # Group revenue by month using the date column
     group_month = group_revenue(
         df, pd.Grouper(key="date", freq="MS"))
-    
+
     # Sort month in chronological order
     group_month = group_month.sort_values(by="date")
 
@@ -114,13 +151,13 @@ def revenue_by_month(df: pd.DataFrame)  -> pd.DataFrame:
     return group_month
 
 
-# Group revenue by weekday 
+# Group revenue by weekday
 def revenue_by_weekday(df: pd.DataFrame)  -> pd.DataFrame:
 
     # Create a DataFrame grouped by weekday
     group_weekday = group_revenue(
         df.assign(weekday=df["date"].dt.dayofweek), "weekday")
-    
+
     # Sort weekdays in chronological order
     group_weekday = group_weekday.sort_values(by="weekday")
 
@@ -222,7 +259,7 @@ def get_order_range_boundaries(df:pd.DataFrame) -> list[float]:
 # Calculate variance of order values
 def calculate_order_value_variance(df: pd.DataFrame) -> float:
     # Calculate total revenue for each order
-    orders = group_revenue(df, "order_id") 
+    orders = group_revenue(df, "order_id")
     variance = orders["revenue"].var()
 
     return float(variance)
@@ -240,7 +277,7 @@ def _calculate_order_boundaries(df: pd.DataFrame) -> list[float]:
 
     if min_revenue == max_revenue:
         return [float(min_revenue)]
-    
+
     # Find the smaller distance between the median and the revenues limits
     distance = min(
         median_revenue - min_revenue,
@@ -270,18 +307,18 @@ def _calculate_order_boundaries(df: pd.DataFrame) -> list[float]:
 
 
 # Calculate mode, quartiles and IRQ of order values
-def calulate_descriptive_statistics(df:pd.DataFrame) -> dict: 
+def calulate_descriptive_statistics(df:pd.DataFrame) -> dict:
     orders = group_revenue(df, "order_id")
     values = orders["revenue"]
-    
+
     if values.empty:
         return {}
-    
+
     mode = values.mode().tolist()
     q1 = values.quantile(0.25)
     q3 = values.quantile(0.75)
     iqr = q3 - q1
-    
+
     return {
         "mode":[float(value) for value in mode],
         "q1": float(q1),
@@ -292,14 +329,14 @@ def calulate_descriptive_statistics(df:pd.DataFrame) -> dict:
 
 # Detect outliners in order values using the IQR methot
 def detect_outliers(df: pd.DataFrame) -> pd.DataFrame:
-    
+
     orders = group_revenue(df, "order_id")
     stats = calulate_descriptive_statistics(df)
-        
+
     if not stats:
         return orders
 
-    # Get quartiles and IQR from the stasistics dictionary    
+    # Get quartiles and IQR from the stasistics dictionary
     q1 = stats["q1"]
     q3 = stats["q3"]
     iqr = stats["iqr"]
@@ -308,7 +345,7 @@ def detect_outliers(df: pd.DataFrame) -> pd.DataFrame:
     lower_bound = q1 - 1.5 * iqr
     upper_bound = q3 + 1.5 * iqr
 
-    # Select orders outside the boundaries   
+    # Select orders outside the boundaries
     outliers = orders[
         (orders["revenue"] < lower_bound) | (orders["revenue"] > upper_bound)
     ]
@@ -324,8 +361,8 @@ def calculate_order_z_scores(df: pd.DataFrame) -> pd.DataFrame:
     if values.empty:
         orders["z_score"] = pd.Series(dtype=float)
         return orders
-        
-    
+
+
     mean = calculate_aov(df)
     std = calculate_order_value_std(df)
 
