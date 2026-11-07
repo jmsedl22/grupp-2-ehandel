@@ -3,21 +3,21 @@ import pandas as pd
 from pandas import DataFrame
 
 
-# Calculate the average order value (AOV)
-def calculate_aov(df: DataFrame)  -> float:
-    # Calculate total revenue and number of unique orders
-    total_revenue = calculate_total_revenue(df)
-    total_orders = count_orders(df)
+def calculate_aov(df: DataFrame) -> float:
+    """
+    Calculates the average order value.
+    """
+    orders = order_totals(df)
+    number_of_orders = len(orders)
 
-    # Avoid division by zero
-    if total_orders == 0:
+    if number_of_orders <= 0:
         return 0.0
 
-    # Calculate AOV
-    aov = total_revenue / total_orders
+    total_revenue = calculate_total_revenue(orders)
+    aov = total_revenue / number_of_orders
 
-    # Return the average revenue per order
     return float(aov)
+
 
 # Count unique orders
 def count_orders(df: DataFrame) -> int:
