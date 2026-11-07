@@ -4,27 +4,27 @@ import pytest
 
 from src.metrics import (
     calculate_aov,
+    calculate_descriptive_statistics,
     calculate_order_ranges,
     calculate_order_value_distribution,
     calculate_order_value_std,
     calculate_order_value_variance,
-    get_order_range_boundaries,
+    calculate_order_z_scores,
     calculate_total_revenue,
     calculate_total_revenue_units,
     calculate_total_units,
+    calculate_units_revenue_correlation,
     count_orders,
+    detect_outliers,
+    get_order_range_boundaries,
     group_revenue,
+    monthly_summary,
     revenue_by_category,
     revenue_by_city,
     revenue_by_month,
-    monthly_summary,
     revenue_by_weekday,
     revenue_top_3_categories,
     revenue_top_3_cities,
-    calculate_descriptive_statistics,
-    calculate_order_z_scores,
-    detect_outliers,
-    calculate_units_revenue_correlation,
 )
 
 
