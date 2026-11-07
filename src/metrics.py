@@ -123,7 +123,7 @@ def order_summary(df: DataFrame) -> dict[str, float]:
     """
     aov = calculate_aov(df)
     distribution = calculate_order_value_distribution(df)
-    stats = calulate_descriptive_statistics(df)
+    stats = calculate_descriptive_statistics(df)
 
     return {
         "aov": aov,
@@ -351,7 +351,7 @@ def calculate_descriptive_statistics(df:DataFrame) -> dict:
 def detect_outliers(df: DataFrame) -> DataFrame:
 
     orders = order_totals(df)
-    stats = calulate_descriptive_statistics(df)
+    stats = calculate_descriptive_statistics(df)
 
     if not stats:
         return orders

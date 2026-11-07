@@ -20,7 +20,7 @@ from src.metrics import (
     revenue_by_weekday,
     revenue_top_3_categories,
     revenue_top_3_cities,
-    calulate_descriptive_statistics,
+    calculate_descriptive_statistics,
     calculate_order_z_scores,
     detect_outliers,
     calculate_units_revenue_correlation,
@@ -381,13 +381,13 @@ def test_calculate_order_value_variance_empty_dataframe():
     assert isinstance(result, float)
 
 
-def test_calulate_descriptive_statistics():
+def test_calculate_descriptive_statistics():
     df = pd.DataFrame({
         "order_id": [101, 102, 103, 104, 105],
         "revenue": [100, 200, 100, 200, 800]
     })
 
-    result = calulate_descriptive_statistics(df)
+    result = calculate_descriptive_statistics(df)
 
     assert result["mode"] == [100, 200]
     assert result["q1"] == 100
