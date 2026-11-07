@@ -1,9 +1,10 @@
-import pandas as pd
 import numpy as np
+import pandas as pd
+from pandas import DataFrame
 
 
 # Calculate the average order value (AOV)
-def calculate_aov(df: pd.DataFrame)  -> float:
+def calculate_aov(df: DataFrame)  -> float:
     # Calculate total revenue and number of unique orders
     total_revenue = calculate_total_revenue(df)
     total_orders = count_orders(df)
@@ -19,7 +20,7 @@ def calculate_aov(df: pd.DataFrame)  -> float:
     return float(aov)
 
 # Count unique orders
-def count_orders(df: pd.DataFrame) -> int:
+def count_orders(df: DataFrame) -> int:
     # Count district order IDs
     count_orders = df["order_id"].nunique()
 
@@ -28,7 +29,7 @@ def count_orders(df: pd.DataFrame) -> int:
 
 
 # Calculate total revenue
-def calculate_total_revenue(df: pd.DataFrame) -> float:
+def calculate_total_revenue(df: DataFrame) -> float:
     # Sum revenues values
     total_revenue = sum(df["revenue"])
 
@@ -36,7 +37,7 @@ def calculate_total_revenue(df: pd.DataFrame) -> float:
     return float(total_revenue)
 
 # Calculate total number of units sold
-def calculate_total_units(df: pd.DataFrame) -> int:
+def calculate_total_units(df: DataFrame) -> int:
     # Check for missing values
     if df["units"].isna().any():
         raise ValueError("Units cannot contain missing value")
@@ -60,17 +61,17 @@ def calculate_total_units(df: pd.DataFrame) -> int:
 
 
 # Combine the results of the two previous functions
-def calculate_total_revenue_units(df: pd.DataFrame) -> tuple[float, int]:
+def calculate_total_revenue_units(df: DataFrame) -> tuple[float, int]:
 
     # Return both results as a tuple
     return calculate_total_revenue(df), calculate_total_units(df)
 
 
 # Group revenue by a selected column
-def group_revenue(df: pd.DataFrame, group_by: str | pd.Grouper ) -> pd.DataFrame:
+def group_revenue(df: DataFrame, group_by: str | pd.Grouper ) -> DataFrame:
 
     # Calculate total revenue for each group
-    group = df.groupby(group_by, as_index= False)["revenue"].sum()
+    group = df.groupby(group_by, as_index= False)[["revenue"]].sum()
 
     # Sort groups by total revenue in descending order
     group = group.sort_values(by="revenue", ascending=False)
@@ -78,7 +79,7 @@ def group_revenue(df: pd.DataFrame, group_by: str | pd.Grouper ) -> pd.DataFrame
     return group
 
 
-def order_totals(df: pd.DataFrame) -> pd.DataFrame:
+def order_totals(df: DataFrame) -> DataFrame:
     """
     Return order_id and summed, unrounded revenue, sorted by revenue descending.
     Raise ValueError for missing required columns, missing order IDs,
@@ -117,27 +118,27 @@ def order_totals(df: pd.DataFrame) -> pd.DataFrame:
 
 
 # Return total revenue grouping by city
-def revenue_by_city(df: pd.DataFrame) -> pd.DataFrame:
+def revenue_by_city(df: DataFrame) -> DataFrame:
     return group_revenue(df, "city")
 
 
 # Return the three cities with highest revenue
-def revenue_top_3_cities(df: pd.DataFrame)  -> pd.DataFrame:
+def revenue_top_3_cities(df: DataFrame)  -> DataFrame:
     return group_revenue(df, "city").head(3)
 
 
 # Return total revenue grouping by category
-def revenue_by_category(df: pd.DataFrame)  -> pd.DataFrame:
+def revenue_by_category(df: DataFrame)  -> DataFrame:
     return group_revenue(df, "category")
 
 
 # Return the three categories with highest revenue
-def revenue_top_3_categories(df: pd.DataFrame)  -> pd.DataFrame:
+def revenue_top_3_categories(df: DataFrame)  -> DataFrame:
     return group_revenue(df, "category").head(3)
 
 
 # Group revenue by month
-def revenue_by_month(df: pd.DataFrame)  -> pd.DataFrame:
+def revenue_by_month(df: DataFrame)  -> DataFrame:
     # Group revenue by month using the date column
     group_month = group_revenue(
         df, pd.Grouper(key="date", freq="MS"))
@@ -152,7 +153,7 @@ def revenue_by_month(df: pd.DataFrame)  -> pd.DataFrame:
 
 
 # Group revenue by weekday
-def revenue_by_weekday(df: pd.DataFrame)  -> pd.DataFrame:
+def revenue_by_weekday(df: DataFrame)  -> DataFrame:
 
     # Create a DataFrame grouped by weekday
     group_weekday = group_revenue(
@@ -179,7 +180,7 @@ def revenue_by_weekday(df: pd.DataFrame)  -> pd.DataFrame:
 
 
 # Calculate minumum, maximum and median order reveneu
-def calculate_order_value_distribution(df: pd.DataFrame) -> dict[str, float]:
+def calculate_order_value_distribution(df: DataFrame) -> dict[str, float]:
     # Calculate total revenue for each order
     orders_total_revenues = group_revenue(df, "order_id")
 
@@ -199,7 +200,7 @@ def calculate_order_value_distribution(df: pd.DataFrame) -> dict[str, float]:
 
 
 # Calculate revenue ranges for order distribution
-def calculate_order_ranges(df: pd.DataFrame) -> pd.DataFrame:
+def calculate_order_ranges(df: DataFrame) -> DataFrame:
     from_to = _calculate_order_boundaries(df)
 
     # Calculate total revenue for each order
@@ -207,7 +208,7 @@ def calculate_order_ranges(df: pd.DataFrame) -> pd.DataFrame:
 
     # Handle orders with identical revenue values
     if len(from_to) == 1:
-        return pd.DataFrame(
+        return DataFrame(
             {
                 "number of orders": [len(orders)],
                 "percentages": [100.0],
@@ -231,7 +232,7 @@ def calculate_order_ranges(df: pd.DataFrame) -> pd.DataFrame:
     count_procent = counts / len(orders)*100
 
     # Create a Data Frame with order counts and percentages
-    result = pd.DataFrame(
+    result = DataFrame(
         {
             "number of orders": counts,
             "percentages" :count_procent
@@ -241,7 +242,7 @@ def calculate_order_ranges(df: pd.DataFrame) -> pd.DataFrame:
     return result
 
 # Calculate standard deviation of order values
-def calculate_order_value_std(df: pd.DataFrame) -> float:
+def calculate_order_value_std(df: DataFrame) -> float:
     # Calculate total revenue for each order
     order = group_revenue(df, "order_id")
 
@@ -251,13 +252,13 @@ def calculate_order_value_std(df: pd.DataFrame) -> float:
     return float(std)
 
 
-def get_order_range_boundaries(df:pd.DataFrame) -> list[float]:
+def get_order_range_boundaries(df:DataFrame) -> list[float]:
     # return revenue range boundaries for plotting
     return _calculate_order_boundaries(df)
 
 
 # Calculate variance of order values
-def calculate_order_value_variance(df: pd.DataFrame) -> float:
+def calculate_order_value_variance(df: DataFrame) -> float:
     # Calculate total revenue for each order
     orders = group_revenue(df, "order_id")
     variance = orders["revenue"].var()
@@ -266,7 +267,7 @@ def calculate_order_value_variance(df: pd.DataFrame) -> float:
 
 
 # Calculate and returns order revenue boundaries
-def _calculate_order_boundaries(df: pd.DataFrame) -> list[float]:
+def _calculate_order_boundaries(df: DataFrame) -> list[float]:
     # Get order revenue statistics
     stats = calculate_order_value_distribution(df)
 
@@ -307,7 +308,7 @@ def _calculate_order_boundaries(df: pd.DataFrame) -> list[float]:
 
 
 # Calculate mode, quartiles and IRQ of order values
-def calulate_descriptive_statistics(df:pd.DataFrame) -> dict:
+def calulate_descriptive_statistics(df:DataFrame) -> dict:
     orders = group_revenue(df, "order_id")
     values = orders["revenue"]
 
@@ -328,7 +329,7 @@ def calulate_descriptive_statistics(df:pd.DataFrame) -> dict:
 
 
 # Detect outliners in order values using the IQR methot
-def detect_outliers(df: pd.DataFrame) -> pd.DataFrame:
+def detect_outliers(df: DataFrame) -> DataFrame:
 
     orders = group_revenue(df, "order_id")
     stats = calulate_descriptive_statistics(df)
@@ -352,7 +353,7 @@ def detect_outliers(df: pd.DataFrame) -> pd.DataFrame:
 
     return outliers
 
-def calculate_order_z_scores(df: pd.DataFrame) -> pd.DataFrame:
+def calculate_order_z_scores(df: DataFrame) -> DataFrame:
     orders = group_revenue(df, "order_id")
 
     # Get order revenue values
@@ -378,7 +379,7 @@ def calculate_order_z_scores(df: pd.DataFrame) -> pd.DataFrame:
 
 
 # Calculate the linear between units sold and revenue
-def calculate_units_revenue_correlation(df: pd.DataFrame) -> float:
+def calculate_units_revenue_correlation(df: DataFrame) -> float:
     correlation = df["units"].corr(df["revenue"])
 
     return float(correlation)
