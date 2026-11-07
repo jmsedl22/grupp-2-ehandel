@@ -15,6 +15,7 @@ from src.metrics import (
     calculate_total_units,
     calculate_units_revenue_correlation,
     count_orders,
+    data_overview,
     detect_outliers,
     get_order_range_boundaries,
     group_revenue,
@@ -828,3 +829,168 @@ def test_order_histogram_validates_order_inputs(column, value):
 
     with pytest.raises(ValueError):
         order_histogram(pd.DataFrame(data))
+
+def test_data_overview_counts_dates_and_preserves_input():
+    df = pd.DataFrame({
+        "date": [
+            "2024-01-01 09:00:00",
+            "2024-01-01 09:00:00",
+            "2024-01-01 18:00:00",
+            "2024-01-03 12:00:00",
+            "not-a-date",
+            None,
+        ],
+        "order_id": ["A", "A", "A", "B", None, "C"],
+        "price": [10.0, 10.0, 5.0, None, -2.0, np.inf],
+        "units": [2, 2, 1, 2, -3, 1],
+        "revenue": [20.0, 20.0, 5.0, None, 6.0, 10.0],
+        "extra": ["x", "x", None, "y", "z", None],
+    })
+    original = df.copy(deep=True)
+
+    result = data_overview(df)
+
+    expected_counts = {
+        "row_count": 6,
+        "order_count": 3,
+        "missing_values_total": 6,
+        "duplicate_row_count": 1,
+        "negative_numeric_row_count": 1,
+        "price_units_discrepancy_count": 0,
+    }
+    assert set(result) == set(expected_counts) | {
+        "missing_values_by_column",
+        "date_min",
+        "date_max",
+        "dates_without_observations",
+    }
+
+    for key, expected in expected_counts.items():
+        assert result[key] == expected
+        assert type(result[key]) is int
+
+    missing = result["missing_values_by_column"]
+    assert isinstance(missing, dict)
+    assert missing == {
+        "date": 1,
+        "order_id": 1,
+        "price": 1,
+        "units": 0,
+        "revenue": 1,
+        "extra": 2,
+    }
+    assert all(type(count) is int for count in missing.values())
+
+    assert result["date_min"] == pd.Timestamp("2024-01-01 09:00:00")
+    assert result["date_max"] == pd.Timestamp("2024-01-03 12:00:00")
+
+    absent_dates = result["dates_without_observations"]
+    assert isinstance(absent_dates, pd.DatetimeIndex)
+    assert absent_dates.tolist() == [pd.Timestamp("2024-01-02")]
+
+    pd.testing.assert_frame_equal(df, original)
+
+
+def test_data_overview_discrepancy_tolerance_and_excluded_rows():
+    df = pd.DataFrame({
+        "date": ["2024-01-01"] * 7,
+        "order_id": list(range(7)),
+        "price": ["2", "2", "1000000", None, "inf", "-inf", "2"],
+        "units": ["3", "3", "1", "3", "1", "1", None],
+        "revenue": ["6.005", "6.02", "1000001", "9", "0", "0", "6"],
+    })
+
+    result = data_overview(df)
+
+    # 6.005 is within tolerance; 6.02 and 1000001 are discrepancies.
+    # Rows containing missing or infinite numeric values are excluded.
+    assert result["price_units_discrepancy_count"] == 2
+    assert result["negative_numeric_row_count"] == 1
+
+
+def test_data_overview_empty_input():
+    df = pd.DataFrame(columns=[
+        "date", "order_id", "price", "units", "revenue", "extra",
+    ])
+
+    result = data_overview(df)
+
+    for key in [
+        "row_count",
+        "order_count",
+        "missing_values_total",
+        "duplicate_row_count",
+        "negative_numeric_row_count",
+        "price_units_discrepancy_count",
+    ]:
+        assert result[key] == 0
+        assert type(result[key]) is int
+
+    assert result["missing_values_by_column"] == {
+        column: 0 for column in df.columns
+    }
+    assert result["date_min"] is pd.NaT
+    assert result["date_max"] is pd.NaT
+
+    absent_dates = result["dates_without_observations"]
+    assert isinstance(absent_dates, pd.DatetimeIndex)
+    assert absent_dates.empty
+
+
+def test_data_overview_without_valid_dates():
+    df = pd.DataFrame({
+        "date": [None, "not-a-date"],
+        "order_id": ["A", "B"],
+        "price": [2.0, 3.0],
+        "units": [1, 1],
+        "revenue": [2.0, 3.0],
+    })
+
+    result = data_overview(df)
+
+    assert result["date_min"] is pd.NaT
+    assert result["date_max"] is pd.NaT
+
+    # The invalid string is not missing in the original input.
+    missing = result["missing_values_by_column"]
+    assert isinstance(missing, dict)
+    assert missing["date"] == 1
+    assert result["missing_values_total"] == 1
+
+    absent_dates = result["dates_without_observations"]
+    assert isinstance(absent_dates, pd.DatetimeIndex)
+    assert absent_dates.empty
+
+
+@pytest.mark.parametrize(
+    "column", ["date", "order_id", "price", "units", "revenue"]
+)
+@pytest.mark.parametrize("empty", [False, True])
+def test_data_overview_rejects_missing_columns(column, empty):
+    df = pd.DataFrame({
+        "date": ["2024-01-01"],
+        "order_id": ["A"],
+        "price": [2.0],
+        "units": [3],
+        "revenue": [6.0],
+    })
+    if empty:
+        df = df.iloc[:0]
+
+    with pytest.raises(ValueError):
+        data_overview(df.drop(columns=[column]))
+
+
+@pytest.mark.parametrize("column", ["price", "units", "revenue"])
+def test_data_overview_rejects_nonnumeric_values(column):
+    data = {
+        "date": ["2024-01-01"],
+        "order_id": ["A"],
+        "price": [2.0],
+        "units": [3],
+        "revenue": [6.0],
+    }
+    data[column] = ["not numeric"]
+
+    with pytest.raises(ValueError):
+        data_overview(pd.DataFrame(data))

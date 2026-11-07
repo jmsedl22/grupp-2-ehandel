@@ -188,7 +188,6 @@ def data_overview(df: DataFrame) -> dict[str, object]:
         numeric.lt(0).any(axis=1).sum()
     )
 
-    # NaN and infinity both fail the finite-value check.
     numeric_values = numeric.to_numpy(dtype=float, na_value=np.nan)
     valid_rows = np.isfinite(numeric_values).all(axis=1)
     valid_values = numeric_values[valid_rows]
