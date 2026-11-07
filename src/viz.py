@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import pandas as pd
-from .metrics import revenue_by_month
+from . metrics import (revenue_by_month, calculate_order_ranges, calculate_aov, calculate_order_value_distribution, calculate_total_units, count_orders,)
 
 def plot_revenue_category(category_revenue) -> None:
     """
@@ -163,3 +163,86 @@ def plot_revenue_distribution_category(df: pd.DataFrame) -> None:
     ax.grid(True, axis="x", linewidth=0.3)
     
     plt.show()
+
+
+def plot_typical_order(df: pd.DataFrame, unit_counts: pd.DataFrame) -> None:
+    """Visualize the value and size of a typical order."""
+
+    fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+
+    # Chart 1: Order value distribution
+    counts, bins, patches = axes[0].hist(
+        df["order_revenue"],
+        bins=25,
+        color="skyblue",
+        edgecolor="white"
+    )
+
+    axes[0].axvline(
+        df["median_revenue"].iloc[0],
+        color="green",
+        linestyle="--",
+        linewidth=2,
+        label=f"Median: {df["median_revenue"].iloc[0]:.2f} SEK"
+    )
+
+    axes[0].axvline(
+        df["average_revenue"].iloc[0],
+        color="purple",
+        linestyle="--",
+        linewidth=2,
+        label=f"Medelvärde: {df["average_revenue"].iloc[0]:.2f} SEK"
+    )
+    axes[0].set_title("FÖRDELNING AV ORDERVÄRDE")
+    axes[0].set_xlabel("Ordervärde [SEK]")
+    axes[0].set_ylabel("Antal order")
+    axes[0].legend()
+    axes[0].set_xticks(bins[::2])
+    axes[0].tick_params(axis="x")
+
+    # Chart 2: Number of products per order
+    axes[1].bar(
+        unit_counts["order_units"],
+        unit_counts["order_count"],
+        color="lightgreen",
+        edgecolor="white",
+        )
+
+    axes[1].axvline(
+            df["median_units"].iloc[0],
+            color="green",
+            linestyle="-.",
+            linewidth=2,
+            label=f"Median: {df["median_units"].iloc[0]:.2f}"
+        )
+    
+    axes[1].axvline(
+        df["average_units"].iloc[0],
+        color="purple",
+        linestyle="-",
+        alpha=0.5,
+        linewidth=2,
+        label=f"Medelvärde: {df["average_units"].iloc[0]:.2f}"
+    )
+
+    axes[1].set_title("ANTAL PRODUKTER PER ORDER")
+    axes[1].set_xlabel("Antal produkter")
+    axes[1].set_ylabel("Antal order")
+    axes[1].legend()
+    axes[1].set_xticks(unit_counts["order_units"])
+
+    # Formatting
+    for ax in axes:
+        ax.grid(True, axis="y", linewidth=0.3)
+        ax.set_axisbelow(True)
+        ax.tick_params(axis="both", labelsize=8)
+
+    fig.suptitle(
+        "HUR SER EN TYPISK ORDER UT?",
+        fontsize=16,
+        fontweight="bold"
+    )
+
+    plt.tight_layout()
+    plt.show()
+
