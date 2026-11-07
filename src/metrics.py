@@ -325,6 +325,49 @@ def order_summary(df: DataFrame) -> dict[str, float]:
     }
 
 
+def large_order_summary(df: DataFrame) -> dict[str, float | int]:
+    """Summarize combined orders strictly above Q3 + 1.5 times IQR.
+
+    Empty input returns a NaN threshold and shares, zero orders, and
+    0.0 revenue. Revenue share is NaN when total order revenue is zero.
+    Constant order values produce no large orders.
+    """
+    orders = order_totals(df)
+
+    if orders.empty:
+        return {
+            "threshold": float("nan"),
+            "order_count": 0,
+            "order_share_pct": float("nan"),
+            "revenue": 0.0,
+            "revenue_share_pct": float("nan"),
+        }
+
+    stats = calculate_descriptive_statistics(df)
+    threshold = float(stats["q3"] + 1.5 * stats["iqr"])
+
+    large_orders = orders.loc[orders["revenue"] > threshold]
+
+    order_count = len(large_orders)
+    revenue = float(large_orders["revenue"].sum())
+    total_revenue = float(orders["revenue"].sum())
+
+    order_share_pct = float(order_count / len(orders) * 100)
+
+    if total_revenue == 0:
+        revenue_share_pct = float("nan")
+    else:
+        revenue_share_pct = float(revenue / total_revenue * 100)
+
+    return {
+        "threshold": threshold,
+        "order_count": order_count,
+        "order_share_pct": order_share_pct,
+        "revenue": revenue,
+        "revenue_share_pct": revenue_share_pct,
+    }
+
+
 # Return total revenue grouping by city
 def revenue_by_city(df: DataFrame) -> DataFrame:
     return group_revenue(df, "city")
