@@ -20,6 +20,7 @@ from src.metrics import (
     group_revenue,
     monthly_category_summary,
     monthly_summary,
+    order_histogram,
     revenue_by_category,
     revenue_by_city,
     revenue_by_month,
@@ -717,3 +718,113 @@ def test_monthly_category_summary_rejects_invalid_values(column, value):
 
     with pytest.raises(ValueError):
         monthly_category_summary(pd.DataFrame(data))
+
+@pytest.mark.parametrize("bins", [2, np.int64(2)])
+def test_order_histogram_combines_orders_and_handles_boundaries(bins):
+    df = pd.DataFrame({
+        "order_id": ["A", "A", "B", "C"],
+        "revenue": ["10", "20", "40", "50"],
+    })
+    original = df.copy(deep=True)
+
+    result = order_histogram(df, bins=bins)
+
+    # Combined revenues are 30, 40, and 50.
+    # 40 belongs to the second bin; the final boundary includes 50.
+    assert result == {
+        "bin_edges": [30.0, 40.0, 50.0],
+        "counts": [1, 2],
+    }
+    pd.testing.assert_frame_equal(df, original)
+
+
+def test_order_histogram_defaults_and_python_types():
+    df = pd.DataFrame({
+        "order_id": ["A", "B", "C"],
+        "revenue": [10.0, 20.0, 30.0],
+    })
+
+    result = order_histogram(df)
+
+    assert set(result) == {"bin_edges", "counts"}
+    assert len(result["bin_edges"]) == 26
+    assert len(result["counts"]) == 25
+    assert sum(result["counts"]) == 3
+    assert all(type(edge) is float for edge in result["bin_edges"])
+    assert all(type(count) is int for count in result["counts"])
+
+
+def test_order_histogram_constant_order_values():
+    df = pd.DataFrame({
+        "order_id": ["A", "A", "B"],
+        "revenue": [2.0, 5.0, 7.0],
+    })
+
+    result = order_histogram(df, bins=4)
+
+    # Both combined orders have revenue 7; NumPy expands the range.
+    assert result == {
+        "bin_edges": [6.5, 6.75, 7.0, 7.25, 7.5],
+        "counts": [0, 0, 2, 0],
+    }
+
+
+def test_order_histogram_negative_revenue_and_unrounded_edges():
+    df = pd.DataFrame({
+        "order_id": ["A", "B"],
+        "revenue": [-10.125, -3.375],
+    })
+
+    result = order_histogram(df, bins=1)
+
+    assert result == {
+        "bin_edges": [-10.125, -3.375],
+        "counts": [2],
+    }
+
+
+def test_order_histogram_empty_input():
+    df = pd.DataFrame(columns=["order_id", "revenue"])
+
+    assert order_histogram(df) == {"bin_edges": [], "counts": []}
+
+
+@pytest.mark.parametrize("columns", [[], ["order_id"], ["revenue"]])
+def test_order_histogram_rejects_missing_columns_even_when_empty(columns):
+    df = pd.DataFrame(columns=columns)
+
+    with pytest.raises(ValueError):
+        order_histogram(df)
+
+
+@pytest.mark.parametrize("bins", [0, -1, 2.5, "3", None, np.float64(3)])
+def test_order_histogram_rejects_invalid_bins(bins):
+    df = pd.DataFrame({
+        "order_id": ["A"],
+        "revenue": [10.0],
+    })
+
+    with pytest.raises(ValueError):
+        order_histogram(df, bins=bins)
+
+
+@pytest.mark.parametrize(
+    "column, value",
+    [
+        ("order_id", None),
+        ("revenue", "not numeric"),
+        ("revenue", None),
+        ("revenue", np.nan),
+        ("revenue", np.inf),
+        ("revenue", -np.inf),
+    ],
+)
+def test_order_histogram_validates_order_inputs(column, value):
+    data = {
+        "order_id": ["A"],
+        "revenue": [10.0],
+    }
+    data[column] = [value]
+
+    with pytest.raises(ValueError):
+        order_histogram(pd.DataFrame(data))
