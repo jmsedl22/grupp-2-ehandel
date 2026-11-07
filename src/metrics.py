@@ -141,7 +141,13 @@ def city_summary(df: DataFrame) -> DataFrame:
 
 
 def revenue_boxplot_summary(df: DataFrame, group_by: str,) ->list[dict[str, object]]:
-    """ Return boxplot statistics for city or category revenue"""
+    """ Return boxplot statistics using individual row revenues"""
+    if df.empty:
+        return[]
+
+    if group_by not in ("city", "category"):
+        raise ValueError("group_by must be city or category")
+    
     result =[]
 
     
