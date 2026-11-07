@@ -187,6 +187,35 @@ def order_totals(df: DataFrame) -> DataFrame:
     return orders[['order_id', 'revenue']]
 
 
+def order_histogram(
+    df: DataFrame,
+    bins: int = 25,
+) -> dict[str, list[float] | list[int]]:
+    """Return histogram bin_edges and counts for combined orders.
+
+    Each bin includes its left boundary and excludes its right boundary,
+    (except the final bin). NumPy determines the range, expanding it
+    automatically for constant order revenues.
+    """
+    if (not isinstance(bins, (int, np.integer)) or bins <= 0):
+        raise ValueError("bins must be a positive integer")
+
+    orders = order_totals(df)
+
+    if orders.empty:
+        return {"bin_edges": [], "counts": []}
+
+    counts, edges = np.histogram(
+        orders["revenue"].to_numpy(),
+        bins=int(bins),
+    )
+
+    return {
+        "bin_edges": [float(edge) for edge in edges],
+        "counts": [int(count) for count in counts],
+    }
+
+
 def order_summary(df: DataFrame) -> dict[str, float]:
     """
     Return statistics for combined order revenues using linear quantile
