@@ -310,6 +310,7 @@ def test_analyzer_combined_revenue_forwards_summaries(settings, monkeypatch, emp
 
 @pytest.mark.parametrize("plotter, columns", [
     (viz.plot_revenue_city, ["city", "revenue", "share_pct"]),
+    (viz.plot_revenue_by_weekday, ["weekday", "revenue"]),
     (viz.plot_monthly_revenue, [
         "month", "revenue", "order_count", "calendar_days", "observed_days",
         "coverage_status", "revenue_per_day", "aov",
@@ -390,6 +391,117 @@ def test_analyzer_monthly_chart_uses_overall_monthly_summary(settings):
         [10.0, np.nan, 30.0],
         equal_nan=True,
     )
+    pd.testing.assert_frame_equal(analyzer.dataframe, original)
+
+
+@pytest.mark.parametrize("empty", [False, True])
+def test_weekday_chart_preserves_prepared_values_theme_and_state(settings, empty):
+    summary = pd.DataFrame({
+        "weekday": ["Sunday", "Monday", "Thursday"],
+        "revenue": [70.0, 30.0, 0.0],
+    }, index=[8, 2, 5])
+    if empty:
+        summary = summary.iloc[:0].copy()
+    original = summary.copy(deep=True)
+    settings_before = deepcopy(settings)
+    rc_before = matplotlib.rcParams.copy()
+    figures_before = plt.get_fignums()
+    interactive_before = plt.isinteractive()
+
+    fig = viz.plot_revenue_by_weekday(summary, settings)
+    fig.canvas.draw()
+    ax = fig.axes[0]
+
+    assert isinstance(fig, Figure)
+    assert len(fig.axes) == 1
+    assert ax.get_title() == "Observerade intäkter per veckodag"
+    assert ax.get_xlabel() == "Veckodag"
+    assert ax.get_ylabel() == "Intäkt [SEK]"
+    assert tuple(fig.get_size_inches()) == pytest.approx(settings["figure_size"])
+    assert fig.get_facecolor() == to_rgba(settings["background_color"])
+    assert ax.get_facecolor() == to_rgba(settings["background_color"])
+    assert ax.title.get_color() == settings["text_color"]
+    assert ax.title.get_fontsize() == settings["title_size"]
+    heights = []
+    for bar in ax.patches:
+        assert isinstance(bar, Rectangle)
+        heights.append(bar.get_height())
+        assert bar.get_facecolor() == to_rgba(settings["main_color"])
+    assert heights == ([] if empty else [70.0, 30.0, 0.0])
+    if empty:
+        assert not ax.axison
+        assert [text.get_text() for text in ax.texts] == ["Inga data"]
+    else:
+        assert [tick.get_text() for tick in ax.get_xticklabels()] == [
+            "Söndag", "Måndag", "Torsdag",
+        ]
+        np.testing.assert_allclose(np.asarray(ax.get_xticks()), [0, 1, 2])
+        assert ax.yaxis.get_major_formatter()(1234.5, 0) == "1 234,50"
+        gridlines = [line for line in ax.get_ygridlines() if line.get_visible()]
+        assert gridlines
+        assert all(line.get_color() == settings["grid_color"] for line in gridlines)
+        assert not any(line.get_visible() for line in ax.get_xgridlines())
+    assert ax.get_legend() is None
+    pd.testing.assert_frame_equal(summary, original)
+    assert settings == settings_before
+    assert matplotlib.rcParams == rc_before
+    assert plt.get_fignums() == figures_before
+    assert plt.isinteractive() == interactive_before
+    assert isinstance(plt.show, Mock)
+    plt.show.assert_not_called()
+
+
+def test_weekday_chart_translates_all_seven_weekdays(settings):
+    summary = pd.DataFrame({
+        "weekday": [
+            "Monday", "Tuesday", "Wednesday", "Thursday", "Friday",
+            "Saturday", "Sunday",
+        ],
+        "revenue": [10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0],
+    })
+
+    fig = viz.plot_revenue_by_weekday(summary, settings)
+    fig.canvas.draw()
+
+    assert [tick.get_text() for tick in fig.axes[0].get_xticklabels()] == [
+        "Måndag", "Tisdag", "Onsdag", "Torsdag", "Fredag", "Lördag", "Söndag",
+    ]
+
+
+def test_analyzer_weekday_chart_uses_existing_metrics_helper(settings, monkeypatch):
+    analyzer = CommerceAnalyzer.__new__(CommerceAnalyzer)
+    analyzer.dataframe = pd.DataFrame({
+        "date": pd.to_datetime([
+            "2024-01-07", "2024-01-01", "2024-01-04", "2024-01-08",
+        ]),
+        "revenue": [70.0, 10.0, 0.0, 20.0],
+    })
+    analyzer.settings = settings
+    original = analyzer.dataframe.copy(deep=True)
+    prepare = Mock(wraps=metrics.revenue_by_weekday)
+    monkeypatch.setattr(metrics, "revenue_by_weekday", prepare)
+    render = Mock(wraps=viz.plot_revenue_by_weekday)
+    monkeypatch.setattr(viz, "plot_revenue_by_weekday", render)
+
+    fig = analyzer.plot_revenue_by_weekday()
+    fig.canvas.draw()
+
+    assert isinstance(fig, Figure)
+    prepare.assert_called_once()
+    assert prepare.call_args.args[0] is analyzer.dataframe
+    render.assert_called_once()
+    assert render.call_args.args[1] is settings
+    supplied = render.call_args.args[0]
+    assert supplied["weekday"].tolist() == ["Monday", "Thursday", "Sunday"]
+    assert supplied["revenue"].tolist() == [30.0, 0.0, 70.0]
+    assert [tick.get_text() for tick in fig.axes[0].get_xticklabels()] == [
+        "Måndag", "Torsdag", "Söndag",
+    ]
+    heights = []
+    for bar in fig.axes[0].patches:
+        assert isinstance(bar, Rectangle)
+        heights.append(bar.get_height())
+    assert heights == [30.0, 0.0, 70.0]
     pd.testing.assert_frame_equal(analyzer.dataframe, original)
 
 

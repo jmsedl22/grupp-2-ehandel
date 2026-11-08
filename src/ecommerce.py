@@ -155,6 +155,10 @@ class CommerceAnalyzer:
         summary = metrics.monthly_summary(self.dataframe)
         return viz.plot_monthly_revenue(summary, self.settings)
 
+    def plot_revenue_by_weekday(self) -> Figure:
+        summary = metrics.revenue_by_weekday(self.dataframe)
+        return viz.plot_revenue_by_weekday(summary, self.settings)
+
     def plot_order_value_distribution(self) -> Figure:
         histogram = metrics.order_histogram(self.dataframe)
         summary = metrics.order_summary(self.dataframe)
