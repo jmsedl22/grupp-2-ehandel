@@ -5,8 +5,8 @@ Group assignment for a course in Python programming. The project aims to build a
 Requires Python 3 (tested with 3.14.7). From the repository root in Windows PowerShell, run:
 
 ```powershell
-python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
+$env:PYTHONPATH = (Get-Location).Path  # Sets the local env, just in case
 .\.venv\Scripts\python.exe -m jupyterlab notebook/ecommerce_sales.ipynb
 ```
 
