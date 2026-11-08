@@ -4,12 +4,16 @@ from math import isfinite
 from textwrap import fill
 from typing import Any
 
-import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import pandas as pd
 from matplotlib import ticker
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
+
+MONTHS = (
+    "januari", "februari", "mars", "april", "maj", "juni", "juli", "augusti",
+    "september", "oktober", "november", "december"
+)
 
 
 @contextmanager
@@ -69,6 +73,14 @@ def _format_date(value: Any) -> str:
         return "—"
 
     return pd.Timestamp(value).strftime("%Y-%m-%d")
+
+
+def _format_month(value: Any) -> str:
+    if pd.isna(value):
+        return "—"
+
+    date = pd.Timestamp(value)
+    return f"{MONTHS[date.month - 1]} {date.year}"
 
 
 def _format_percentage(value: Any) -> str:
@@ -187,42 +199,47 @@ def plot_monthly_revenue(
     summary: pd.DataFrame,
     settings: Mapping[str, Any],
 ) -> Figure:
-    """Plot prepared monthly category revenues, retaining observation gaps."""
-    with _chart(settings) as (fig, ax):
-        ax.set_title("Intäkt per månad och kategori")
-        ax.set_xlabel("Månad")
-        ax.set_ylabel("Intäkt [SEK]")
+    """Plot observed monthly revenue, preserving gaps in observations."""
+    width, height = settings["figure_size"]
+    width = max(width, 1.5 + 0.9 * len(summary))
+
+    with _chart(settings, figsize=(width, height)) as (fig, ax):
+        ax.set_title("Observerade intäkter per månad")
+        ax.set_xlabel(
+            "Månad\nLuckor i linjen: månader utan observationer."
+        )
+        ax.set_ylabel("Observerade intäkter [SEK]")
 
         if summary.empty:
             _empty_chart(ax)
-        else:
-            for category, group in summary.groupby(
-                "category",
-                dropna=False,
-                observed=True,
-                sort=False,
-            ):
-                ax.plot(
-                    group["month"],
-                    group["revenue"],
-                    marker="o",
-                    linewidth=2,
-                    markersize=6,
-                    label="Ej angivet" if pd.isna(category) else str(category),
-                )
+            return fig
 
-            locator = mdates.AutoDateLocator()
-            ax.xaxis.set_major_locator(locator)
-            ax.xaxis.set_major_formatter(
-                mdates.ConciseDateFormatter(locator)
+        months = summary["month"]
+        ax.plot(
+            months,
+            summary["revenue"],
+            color=settings["main_color"],
+            marker="o",
+            linewidth=2,
+            markersize=6,
+        )
+        ax.set_xticks(
+            months,
+            labels=[
+                _format_month(month).replace(" ", "\n")
+                for month in months
+            ],
+        )
+        ax.set_xlim(
+            months.iloc[0] - pd.Timedelta(days=15),
+            months.iloc[-1] + pd.Timedelta(days=15),
+        )
+        ax.yaxis.set_major_formatter(
+            ticker.FuncFormatter(
+                lambda value, _position: _format_number(value)
             )
-            ax.yaxis.set_major_formatter(
-                ticker.FuncFormatter(
-                    lambda value, _position: _format_number(value)
-                )
-            )
-            ax.legend(title="Kategori")
-            ax.grid(True, axis="y")
+        )
+        ax.grid(True, axis="y")
 
         return fig
 

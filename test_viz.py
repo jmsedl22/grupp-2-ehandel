@@ -107,7 +107,10 @@ def test_city_chart_preserves_missing_labels_and_input(settings):
 
 @pytest.mark.parametrize("plotter, columns", [
     (viz.plot_revenue_city, ["city", "revenue", "share_pct"]),
-    (viz.plot_monthly_revenue, ["month", "category", "revenue"]),
+    (viz.plot_monthly_revenue, [
+        "month", "revenue", "order_count", "calendar_days", "observed_days",
+        "coverage_status", "revenue_per_day", "aov",
+    ]),
 ])
 def test_prepared_charts_handle_empty_input(settings, plotter, columns):
     summary = pd.DataFrame(columns=columns)
@@ -122,56 +125,103 @@ def test_prepared_charts_handle_empty_input(settings, plotter, columns):
     assert plt.get_fignums() == []
 
 
-def test_monthly_chart_preserves_dates_gaps_zero_and_missing_category(settings):
+def test_monthly_chart_preserves_overall_totals_dates_gaps_and_zero(settings):
     source = pd.DataFrame({
-        "date": pd.to_datetime(["2024-01-10", "2024-03-01", "2024-02-03"]),
-        "category": ["Books", "Books", None],
-        "revenue": [0.0, 30.0, 20.0],
+        "date": pd.to_datetime([
+            "2024-03-01", "2024-01-10", "2024-03-15", "2024-01-20",
+        ]),
+        "order_id": ["A", "B", "C", "D"],
+        "category": ["Books", "Books", "Clothing", None],
+        "revenue": [10.0, 5.0, 20.0, -5.0],
     })
-    summary = metrics.monthly_category_summary(source)
+    summary = metrics.monthly_summary(source)
     original = summary.copy(deep=True)
+    figures_before = plt.get_fignums()
 
     fig = viz.plot_monthly_revenue(summary, settings)
     fig.canvas.draw()
-    lines = {line.get_label(): line for line in fig.axes[0].lines}
+    ax = fig.axes[0]
 
-    assert set(lines) == {"Books", "Ej angivet"}
-    assert pd.to_datetime(np.asarray(lines["Books"].get_xdata())).tolist() == [
+    assert len(ax.lines) == 1
+    line = ax.lines[0]
+    assert pd.to_datetime(np.asarray(line.get_xdata())).tolist() == [
         pd.Timestamp("2024-01-01"),
         pd.Timestamp("2024-02-01"),
         pd.Timestamp("2024-03-01"),
     ]
     np.testing.assert_allclose(
-        np.asarray(lines["Books"].get_ydata(), dtype=float),
+        np.asarray(line.get_ydata(), dtype=float),
         [0.0, np.nan, 30.0],
         equal_nan=True,
     )
-    np.testing.assert_allclose(
-        np.asarray(lines["Ej angivet"].get_ydata(), dtype=float),
-        [np.nan, 20.0, np.nan],
-        equal_nan=True,
-    )
+    assert [tick.get_text() for tick in ax.get_xticklabels()] == [
+        "januari\n2024", "februari\n2024", "mars\n2024",
+    ]
+    assert to_rgba(line.get_color()) == to_rgba(settings["main_color"])
+    assert ax.get_title() == "Observerade intäkter per månad"
+    assert ax.get_ylabel() == "Observerade intäkter [SEK]"
+    assert "månader utan observationer" in ax.get_xlabel()
+    assert ax.get_legend() is None
+    assert plt.get_fignums() == figures_before
     pd.testing.assert_frame_equal(summary, original)
 
 
-def test_analyzer_monthly_chart_uses_prepared_summary(settings):
+def test_analyzer_monthly_chart_uses_overall_monthly_summary(settings):
     analyzer = CommerceAnalyzer.__new__(CommerceAnalyzer)
     analyzer.dataframe = pd.DataFrame({
-        "date": pd.to_datetime(["2024-01-01", "2024-03-01"]),
-        "category": ["Books", "Books"],
-        "revenue": [10.0, 30.0],
+        "date": pd.to_datetime(["2024-01-01", "2024-01-02", "2024-03-01"]),
+        "order_id": ["A", "B", "C"],
+        "category": ["Books", "Clothing", None],
+        "revenue": [4.0, 6.0, 30.0],
     })
     analyzer.settings = settings
+    original = analyzer.dataframe.copy(deep=True)
 
     fig = analyzer.plot_monthly_revenue()
     fig.canvas.draw()
 
     assert isinstance(fig, Figure)
+    assert len(fig.axes[0].lines) == 1
     np.testing.assert_allclose(
         np.asarray(fig.axes[0].lines[0].get_ydata(), dtype=float),
         [10.0, np.nan, 30.0],
         equal_nan=True,
     )
+    pd.testing.assert_frame_equal(analyzer.dataframe, original)
+
+
+@pytest.mark.parametrize("value, expected", [
+    ("2024-01-15", "januari 2024"),
+    ("2024-09-01", "september 2024"),
+    ("2024-12-31", "december 2024"),
+    (pd.NaT, "—"),
+])
+def test_format_month_uses_swedish_names_and_handles_missing(value, expected):
+    assert viz._format_month(value) == expected
+
+
+@pytest.mark.parametrize("month_count", [1, 12])
+def test_monthly_chart_scales_width_and_pads_date_limits(settings, month_count):
+    source = pd.DataFrame({
+        "date": pd.date_range("2024-01-01", periods=month_count, freq="MS"),
+        "order_id": list(range(month_count)),
+        "revenue": [10.0] * month_count,
+    })
+    summary = metrics.monthly_summary(source)
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        fig = viz.plot_monthly_revenue(summary, settings)
+        fig.canvas.draw()
+
+    ax = fig.axes[0]
+    assert tuple(fig.get_size_inches()) == pytest.approx((
+        max(settings["figure_size"][0], 1.5 + 0.9 * month_count),
+        settings["figure_size"][1],
+    ))
+    positions = np.asarray(ax.lines[0].get_xdata(orig=False), dtype=float)
+    np.testing.assert_allclose(np.asarray(ax.get_xticks()), positions)
+    assert ax.get_xlim() == pytest.approx((positions[0] - 15, positions[-1] + 15))
 
 
 @pytest.mark.parametrize("counts, percentages", [

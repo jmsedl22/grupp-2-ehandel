@@ -70,7 +70,9 @@ def _style_table(
     caption: str,
     numeric_columns: Sequence[str] = (),
 ) -> Styler:
-    """Helper function that keeps a consistent style to all tables."""
+    """
+    Helper function that keeps a consistent style to all tables.
+    """
     styles = {
         "": [("border-collapse", "collapse")],
         "caption, th, td": [
