@@ -51,6 +51,7 @@ Responsibilities are divided by file, but subject to change as work progresses.
 - Katerina - metrics.py
 - Natasa - viz.py
 - Jacob - ecommerce_sales.ipynb, README.md (documentation), and final check
+- Tanveer - CommerceAnalyzer type definitions and order-metric tests.
 
 ## Architecture
 `CommerceAnalyzer` in `src/ecommerce.py` loads data and coordinates calculations and presentation.
