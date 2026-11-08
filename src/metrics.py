@@ -140,6 +140,42 @@ def city_summary(df: DataFrame) -> DataFrame:
     return _group_revenue_summary(df, "city")
 
 
+def revenue_boxplot_summary(df: DataFrame, group_by: str,) ->list[dict[str, object]]:
+    """ Return boxplot statistics using individual row revenues"""
+    if df.empty:
+        return[]
+
+    if group_by not in ("city", "category"):
+        raise ValueError("group_by must be city or category")
+    
+    result =[]
+
+    
+    for label, group in df.groupby(group_by, dropna=False):
+        values = group["revenue"]
+
+        q1, med, q3 = values.quantile([0.25, 0.5, 0.75], interpolation="linear")
+        iqr = q3-q1
+
+        low=q1-1.5*iqr
+        high=q3+1.5*iqr
+
+        inside = values.between(low, high)
+        result.append({
+            "label": str(label),
+            "med": float(med),
+            "q1": float(q1),
+            "q3": float(q3),
+            "whislo": float(values[inside].min()), 
+            "whishi": float(values[inside].max()),
+            "fliers": values[~inside].astype(float).tolist(),
+        })
+
+    return sorted(result, key=lambda x: (x["med"], x["label"]))
+
+
+
+
 def top_categories_summary(df: DataFrame, n: int = 3) -> DataFrame:
     """Return the top n categories with revenue shares."""
     if (not isinstance(n, (int, np.integer)) or n <= 0):
