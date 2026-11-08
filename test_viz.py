@@ -1,4 +1,5 @@
 import warnings
+from copy import deepcopy
 from unittest.mock import Mock
 
 import matplotlib
@@ -34,6 +35,9 @@ def settings():
         "text_color": "#243239",
         "grid_color": "#D9E2E3",
         "main_color": "#246B75",
+        "histogram_color": "#72A9AB",
+        "aov_color": "#B85B31",
+        "median_color": "#20434B",
         "font_family": "DejaVu Sans",
         "font_size": 9,
         "title_size": 12,
@@ -224,33 +228,145 @@ def test_monthly_chart_scales_width_and_pads_date_limits(settings, month_count):
     assert ax.get_xlim() == pytest.approx((positions[0] - 15, positions[-1] + 15))
 
 
-@pytest.mark.parametrize("counts, percentages", [
+@pytest.mark.parametrize("edges, counts", [
     ([], []),
-    ([0, 0], [0.0, 0.0]),
-    ([2, 1], [66.67, 33.33]),
+    ([0.0, 10.0, 20.0], [0, 0]),
+    ([0.0, 10.0, 30.0], [2, 1]),
 ])
-def test_order_distribution_handles_empty_zero_and_nonempty(counts, percentages):
-    summary = pd.DataFrame({
-        "number of orders": counts,
-        "percentages": percentages,
-    }, index=[f"group{i}" for i in range(len(counts))])
+def test_order_distribution_handles_empty_zero_and_nonempty(settings, edges, counts):
+    histogram = {"bin_edges": edges, "counts": counts}
+    summary = {
+        "aov": 9.0 if counts else 0.0,
+        "median_revenue": 5.0 if counts else float("nan"),
+    }
+    original_histogram = deepcopy(histogram)
+    original_summary = summary.copy()
+    figures_before = plt.get_fignums()
 
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        viz.plot_order_value_distribution(summary)
-        fig = plt.gcf()
+        fig = viz.plot_order_value_distribution(histogram, summary, settings)
         fig.canvas.draw()
 
+    assert isinstance(fig, Figure)
     ax = fig.axes[0]
     assert len(ax.patches) == len(counts)
+    for index, bar in enumerate(ax.patches):
+        assert isinstance(bar, Rectangle)
+        assert bar.get_x() == pytest.approx(edges[index])
+        assert bar.get_width() == pytest.approx(edges[index + 1] - edges[index])
+        assert bar.get_height() == counts[index]
+        assert bar.get_facecolor() == to_rgba(settings["histogram_color"])
+        assert bar.get_edgecolor() == to_rgba(settings["background_color"])
+
     if counts:
         assert ax.get_ylim()[1] > 0
-        assert [text.get_text() for text in ax.texts] == [
-            f"{percentage:.2f}%" for percentage in percentages
+        assert len(ax.lines) == 2
+        aov_line, median_line = ax.lines
+        np.testing.assert_allclose(
+            np.asarray(aov_line.get_xdata(), dtype=float), [9.0, 9.0],
+        )
+        np.testing.assert_allclose(
+            np.asarray(median_line.get_xdata(), dtype=float), [5.0, 5.0],
+        )
+        assert aov_line.get_linestyle() == "--"
+        assert median_line.get_linestyle() == "-"
+        assert to_rgba(aov_line.get_color()) == to_rgba(settings["aov_color"])
+        assert to_rgba(median_line.get_color()) == to_rgba(settings["median_color"])
+        assert aov_line.get_zorder() > median_line.get_zorder()
+        legend = ax.get_legend()
+        assert legend is not None
+        assert [text.get_text() for text in legend.get_texts()] == [
+            "AOV: 9,00 SEK", "Median: 5,00 SEK",
         ]
+        assert ax.xaxis.get_major_formatter()(1234.5, 0) == "1 234,50"
+        assert ax.yaxis.get_major_formatter()(1000, 0) == "1 000"
+        ticks = np.asarray(ax.get_yticks(), dtype=float)
+        np.testing.assert_allclose(ticks, np.round(ticks))
     else:
         assert not ax.axison
         assert [text.get_text() for text in ax.texts] == ["Inga data"]
+        assert len(ax.lines) == 0
+        assert ax.get_legend() is None
+
+    assert plt.get_fignums() == figures_before
+    assert histogram == original_histogram
+    pd.testing.assert_series_equal(pd.Series(summary), pd.Series(original_summary))
+
+
+@pytest.mark.parametrize("revenue", [0.0, 7.0, -10.0])
+def test_order_distribution_handles_constant_order_totals(settings, revenue):
+    source = pd.DataFrame({
+        "order_id": ["A", "A", "B"],
+        "revenue": [revenue / 2, revenue / 2, revenue],
+    })
+    histogram = metrics.order_histogram(source)
+    summary = metrics.order_summary(source)
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        fig = viz.plot_order_value_distribution(histogram, summary, settings)
+        fig.canvas.draw()
+
+    ax = fig.axes[0]
+    assert len(ax.patches) == 25
+    heights = []
+    for bar in ax.patches:
+        assert isinstance(bar, Rectangle)
+        assert bar.get_width() > 0
+        heights.append(bar.get_height())
+    assert sum(heights) == 2
+    assert len(ax.lines) == 2
+    for line in ax.lines:
+        np.testing.assert_allclose(
+            np.asarray(line.get_xdata(), dtype=float), [revenue, revenue],
+        )
+    assert ax.get_ylim()[1] > 0
+    legend = ax.get_legend()
+    assert legend is not None
+    assert len(legend.get_texts()) == 2
+
+
+@pytest.mark.parametrize("empty", [False, True])
+def test_analyzer_order_distribution_uses_combined_orders(settings, empty):
+    analyzer = CommerceAnalyzer.__new__(CommerceAnalyzer)
+    analyzer.dataframe = pd.DataFrame({
+        "order_id": ["A", "A", "B", "C"],
+        "revenue": [10.0, 20.0, 50.0, 100.0],
+    })
+    if empty:
+        analyzer.dataframe = analyzer.dataframe.iloc[:0].copy()
+    analyzer.settings = settings
+    original = analyzer.dataframe.copy(deep=True)
+    figures_before = plt.get_fignums()
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        fig = analyzer.plot_order_value_distribution()
+        fig.canvas.draw()
+
+    assert isinstance(fig, Figure)
+    ax = fig.axes[0]
+    if empty:
+        assert not ax.axison
+        assert len(ax.patches) == 0
+        assert len(ax.lines) == 0
+    else:
+        assert len(ax.patches) == 25
+        heights = []
+        for bar in ax.patches:
+            assert isinstance(bar, Rectangle)
+            heights.append(bar.get_height())
+        assert sum(heights) == 3
+        assert len(ax.lines) == 2
+        np.testing.assert_allclose(
+            np.asarray(ax.lines[0].get_xdata(), dtype=float), [60.0, 60.0],
+        )
+        np.testing.assert_allclose(
+            np.asarray(ax.lines[1].get_xdata(), dtype=float), [50.0, 50.0],
+        )
+    assert plt.get_fignums() == figures_before
+    pd.testing.assert_frame_equal(analyzer.dataframe, original)
 
 
 @pytest.mark.parametrize("plotter, group_column", [

@@ -244,45 +244,73 @@ def plot_monthly_revenue(
         return fig
 
 
-def plot_order_value_distribution(df: pd.DataFrame) -> None:
+def plot_order_value_distribution(
+    histogram: Mapping[str, list[float] | list[int]],
+    summary: Mapping[str, float],
+    settings: Mapping[str, Any],
+) -> Figure:
     """
-    Creates a bar chart for order value distribution
+    Creates a bar chart for order value distribution.
     """
-    _fig, ax = plt.subplots(figsize=(8, 5), constrained_layout=True)
+    with _chart(settings) as (fig, ax):
+        ax.set_title("Fördelning av ordervärden")
+        ax.set_xlabel("Ordervärde [SEK]")
+        ax.set_ylabel("Antal order")
 
-    if df.empty:
-        _empty_chart(ax)
-        plt.show()
-        return
+        counts = histogram["counts"]
+        if not counts:
+            _empty_chart(ax)
+            return fig
 
-    number_of_orders = df["number of orders"].to_list()
-    percentages = df["percentages"].to_list()
-    labels = df.index.to_list()
-    bars = ax.bar(labels, number_of_orders, color="darkorange")
-
-    for bar, percentage in zip(bars, percentages):
-        x = bar.get_x() + bar.get_width() / 2
-        y = bar.get_height()
-
-        ax.annotate(
-            f"{percentage:.2f}%",
-            xy=(x, y),
-            xytext=(0, 5),
-            textcoords="offset points",
-            ha="center",
-            va="bottom"
+        edges = histogram["bin_edges"]
+        widths = [
+            right - left
+            for left, right in zip(edges, edges[1:])
+        ]
+        ax.bar(
+            edges[:-1],
+            counts,
+            width=widths,
+            align="edge",
+            color=settings["histogram_color"],
+            edgecolor=settings["background_color"],
         )
 
-    ax.set_title(
-        "Fördelning av ordervärden", fontsize=16, fontweight= "bold", pad=20)
-    ax.set_xlabel("Orderintäkt intervall [SEK]", fontsize=14, labelpad=20)
-    ax.set_ylabel("Antal beställningar", fontsize=14, labelpad=20)
-    ax.tick_params(axis="x", rotation=15)
-    ax.set_ylim(0, max(1.0, max(number_of_orders) * 1.2))
-    ax.grid(True, axis="y", linewidth=0.3)
-    ax.set_axisbelow(True)
+        aov = summary["aov"]
+        median = summary["median_revenue"]
+        ax.axvline(
+            aov,
+            color=settings["aov_color"],
+            linestyle="--",
+            linewidth=2,
+            zorder=4,
+            label=f"AOV: {_format_number(aov)} SEK",
+        )
+        ax.axvline(
+            median,
+            color=settings["median_color"],
+            linestyle="-",
+            linewidth=2,
+            zorder=3,
+            label=f"Median: {_format_number(median)} SEK",
+        )
 
-    plt.show()
+        ax.xaxis.set_major_formatter(
+            ticker.FuncFormatter(
+                lambda value, _position: _format_number(value)
+            )
+        )
+        ax.yaxis.set_major_locator(ticker.MaxNLocator(integer=True))
+        ax.yaxis.set_major_formatter(
+            ticker.FuncFormatter(
+                lambda value, _position: _format_number(value, 0)
+            )
+        )
+        ax.set_ylim(0, max(1.0, max(counts) * 1.2))
+        ax.grid(True, axis="y")
+        ax.legend()
+
+        return fig
 
 
 def plot_revenue_distribution_city(df: pd.DataFrame) -> None:

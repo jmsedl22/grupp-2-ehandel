@@ -148,9 +148,15 @@ class CommerceAnalyzer:
         summary = metrics.monthly_summary(self.dataframe)
         return viz.plot_monthly_revenue(summary, self.settings)
 
-    def plot_order_value_distribution(self) -> None:
-        order_ranges_df = self.order_ranges()
-        viz.plot_order_value_distribution(order_ranges_df)
+    def plot_order_value_distribution(self) -> Figure:
+        histogram = metrics.order_histogram(self.dataframe)
+        summary = metrics.order_summary(self.dataframe)
+
+        return viz.plot_order_value_distribution(
+            histogram,
+            summary,
+            self.settings,
+        )
 
     def plot_revenue_distribution_city(self) -> None:
         viz.plot_revenue_distribution_city(self.dataframe)
