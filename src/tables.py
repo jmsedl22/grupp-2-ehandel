@@ -10,6 +10,12 @@ MONTHS = (
     "januari", "februari", "mars", "april", "maj", "juni", "juli", "augusti",
     "september", "oktober", "november", "december"
 )
+COLUMN_LABELS = {
+    "category": "Kategori",
+    "city": "Stad",
+    "revenue": "Intäkter",
+    "share_pct": "Andel av totala intäkter",
+}
 
 
 def _format_number(value: Any, decimals: int) -> str:
@@ -121,24 +127,26 @@ def _revenue_table(
     summary: pd.DataFrame,
     settings: Mapping[str, Any],
     group_column: str,
-    group_heading: str,
     caption: str,
 ) -> Styler:
-    df = summary[[group_column, "revenue", "share_pct"]].rename(columns={
-        group_column: group_heading,
-        "revenue": "Intäkter",
-        "share_pct": "Andel av totala intäkter",
-    })
+    group_heading = COLUMN_LABELS[group_column]
+    numerics = {
+        COLUMN_LABELS["revenue"]: format_amount,
+        COLUMN_LABELS["share_pct"]: format_percentage,
+    }
+
+    df = summary[[group_column, "revenue", "share_pct"]].rename(
+        columns=COLUMN_LABELS
+    )
 
     return _style_table(
         df,
         settings,
         caption,
-        numeric_columns=["Intäkter", "Andel av totala intäkter"],
+        numeric_columns=list(numerics)
     ).format({
         group_heading: format_label,
-        "Intäkter": format_amount,
-        "Andel av totala intäkter": format_percentage,
+        **numerics
     }, escape="html")
 
 
@@ -148,7 +156,7 @@ def category_table(
 ) -> Styler:
     return _revenue_table(
         summary, settings,
-        "category", "Kategori", "Intäkter per kategori",
+        "category", "Intäkter per kategori",
     )
 
 
@@ -158,7 +166,7 @@ def city_table(
 ) -> Styler:
     return _revenue_table(
         summary, settings,
-        "city", "Stad", "Intäkter per stad",
+        "city", "Intäkter per stad",
     )
 
 
@@ -168,5 +176,5 @@ def top_categories_table(
 ) -> Styler:
     return _revenue_table(
         summary, settings,
-        "category", "Kategori", "Topp 3 kategorier",
+        "category", "Topp 3 kategorier",
     )

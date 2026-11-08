@@ -67,6 +67,18 @@ class CommerceAnalyzer:
     def summary_table(self) -> Styler:
         return tables.summary_table(self.summary(), self.settings)
 
+    def category_table(self) -> Styler:
+        result = metrics.category_summary(self.dataframe)
+        return tables.category_table(result, self.settings)
+
+    def city_table(self) -> Styler:
+        result = metrics.city_summary(self.dataframe)
+        return tables.city_table(result, self.settings)
+
+    def top_categories_table(self) -> Styler:
+        result = metrics.top_categories_summary(self.dataframe, n=3)
+        return tables.top_categories_table(result, self.settings)
+
     def revenue_by_category(self) -> DataFrame:
         return metrics.revenue_by_category(self.dataframe)
 
