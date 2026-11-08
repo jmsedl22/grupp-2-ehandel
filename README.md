@@ -5,8 +5,8 @@ Group assignment for a course in Python programming. The project aims to build a
 Requires Python 3 (tested with 3.14.7). From the repository root in Windows PowerShell, run:
 
 ```powershell
-python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
+$env:PYTHONPATH = (Get-Location).Path  # Sets the local env, just in case
 .\.venv\Scripts\python.exe -m jupyterlab notebook/ecommerce_sales.ipynb
 ```
 
@@ -52,51 +52,38 @@ Responsibilities are divided by file, but subject to change as work progresses.
 - Jacob - ecommerce_sales.ipynb, README.md (documentation), and final check
 
 ## Architecture
-`CommerceAnalyzer` in `src/ecommerce.py` is a single interface to the notebook
-for data loading, reusable calculations and chart generation.
-
-- `io_utils.py` handles data loading.
-- `metrics.py` implements calculations.
-- `viz.py` implements charts.
-- `CommerceAnalyzer` holds the dataset and coordinates calls to these modules.
-- The notebook formats and displays returned tables and contains the written analysis.
+`CommerceAnalyzer` in `src/ecommerce.py` loads data and coordinates calculations and presentation.
 
 ```mermaid
 flowchart TD
-    N("Notebook report file") -->|CommerceAnalyzer| E("ecommerce.py")
-    
-    E -->|Key indicators| M("metrics.py")
-    E -->|Diagrams| V("viz.py")
-    E -->|Data loading| IO("io_utils.py")
+    N["Report notebook"] --> E["ecommerce.py"]
+    E --> IO["io_utils.py"]
+    E --> M["metrics.py"]
+    E --> T["tables.py"]
+    E --> V["viz.py"]
 ```
+
+- `io_utils.py` loads the dataset.
+- `metrics.py` prepares calculation results.
+- `tables.py` formats prepared results as `Styler` tables.
+- `viz.py` renders prepared results as `Figure` objects.
+
+Notebook code cells contains analyzer setup and output calls, and markdown cells contain the analysis.
 
 ## Project structure
 The project structure follows the proposed template given in the assignment description. 
 ```
 grupp-2-ehandel/
 ├── data/
-│   └── ecommerce_sales.csv   # Input dataset for the analysis
+│   └── ecommerce_sales.csv    # Input dataset for the analysis
 ├── notebook/
-│   └── ecommerce_sales.ipynb # Main analysis notebook
+│   └── ecommerce_sales.ipynb  # Main analysis notebook
 ├── src/
-│   ├── ecommerce.py          # E-commerce analysis, notebook interface
-│   ├── io_utils.py           # Data loading, file handling
-│   ├── metrics.py            # Sales metric calculations
-│   └── viz.py                # Charts, visualizations
+│   ├── ecommerce.py           # E-commerce analysis, notebook interface
+│   ├── io_utils.py            # Data loading, file handling
+│   ├── metrics.py             # Sales metric calculations
+│   ├── tables.py              # Styling the tables
+│   └── viz.py                 # Charts, visualizations
 ├── .gitignore
 └── README.md
 ```
-
-## Architecture
-The ecommerce.py file contains a class CommerceAnalyzer, that acts as an interface and coordinator to the notebook. It then assists in presenting the results in the report.
-```mermaid
-flowchart TD
-    N("Notebook report file") -->|CommerceAnalyzer| E("ecommerce.py")
-    
-    E -->|Key indicators| M("metrics.py")
-    E -->|Diagrams| V("viz.py")
-    E -->|Data loading| IO("io_utils.py")
-```
-Reusable calculations and chart implementations belong in `src/`.
-The notebook accesses them through `CommerceAnalyzer` and handles table
-presentation and written analysis.
