@@ -1,13 +1,15 @@
 import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker
 import pandas as pd
-from . metrics import (revenue_by_month, calculate_order_ranges, calculate_aov, calculate_order_value_distribution, calculate_total_units, count_orders,)
+from matplotlib import ticker
+
+from .metrics import revenue_by_month
+
 
 def plot_revenue_category(category_revenue) -> None:
     """
     Creates a bar chart for total revenue by product category
     """
-    fig, ax = plt.subplots(figsize=(8, 5), constrained_layout=True)
+    _fig, ax = plt.subplots(figsize=(8, 5), constrained_layout=True)
 
     ax.barh(category_revenue["category"], category_revenue["revenue"] ,color="turquoise")
     ax.set_title("Intäkt per kategori", fontsize=16, fontweight= "bold", pad=20)
@@ -25,7 +27,7 @@ def plot_revenue_city(city_revenue) -> None:
     """
     Creates a bar chart for total revenue by city
     """
-    fig, ax = plt.subplots(figsize=(8, 5), constrained_layout=True)
+    _fig, ax = plt.subplots(figsize=(8, 5), constrained_layout=True)
 
     ax.barh(city_revenue["city"], city_revenue["revenue"], color="lightgreen")
     ax.set_title("Intäkt per stad", fontsize=16, fontweight= "bold", pad=20)
@@ -43,7 +45,7 @@ def plot_monthly_revenue(df: pd.DataFrame) -> None:
     """
     Creates a multi-line chart for monthly revenue by category
     """
-    fig, ax = plt.subplots(figsize=(8, 5), constrained_layout=True)
+    _fig, ax = plt.subplots(figsize=(8, 5), constrained_layout=True)
 
     for category in df["category"].unique():
         category_data = df[df["category"] == category]
@@ -76,7 +78,7 @@ def plot_order_value_distribution(df: pd.DataFrame) -> None:
     percentages = df["percentages"].to_list()
     labels = df.index.to_list()
 
-    fig, ax = plt.subplots(figsize=(8, 5), constrained_layout=True)
+    _fig, ax = plt.subplots(figsize=(8, 5), constrained_layout=True)
     bars = ax.bar(labels, number_of_orders, color="darkorange")
 
     for bar, percentage in zip(bars, percentages):
@@ -114,8 +116,13 @@ def plot_revenue_distribution_city(df: pd.DataFrame) -> None:
         for city in cities
     ]
 
-    fig, ax = plt.subplots(figsize=(8, 5), constrained_layout=True)
-    bp = ax.boxplot(revenue_by_city, tick_labels=cities, vert=False, patch_artist=True)
+    _fig, ax = plt.subplots(figsize=(8, 5), constrained_layout=True)
+    bp = ax.boxplot(
+        revenue_by_city,
+        tick_labels=[str(city) for city in cities],
+        vert=False,
+        patch_artist=True,
+    )
     colors = ["lightcyan", "lightblue", "dodgerblue", "steelblue", "darkblue"]
     for patch, color in zip(bp["boxes"], colors):
         patch.set_facecolor(color)
@@ -143,8 +150,13 @@ def plot_revenue_distribution_category(df: pd.DataFrame) -> None:
         for category in categories
     ]
 
-    fig, ax = plt.subplots(figsize=(8, 5), constrained_layout=True)
-    bp = ax.boxplot(revenue_by_category, tick_labels=categories, vert=False, patch_artist=True)
+    _fig, ax = plt.subplots(figsize=(8, 5), constrained_layout=True)
+    bp = ax.boxplot(
+        revenue_by_category,
+        tick_labels=[str(category) for category in categories],
+        vert=False,
+        patch_artist=True,
+    )
     colors = ["thistle", "plum", "mediumorchid", "blueviolet", "indigo"]
     for patch, color in zip(bp["boxes"], colors):
         patch.set_facecolor(color)
@@ -155,7 +167,12 @@ def plot_revenue_distribution_category(df: pd.DataFrame) -> None:
     for flier in bp['fliers']:
         flier.set(alpha = 0.5)
 
-    ax.set_title("Intäktsfördelning per kategori", fontsize=16, fontweight= "bold", pad=20)
+    ax.set_title(
+        "Intäktsfördelning per kategori",
+        fontsize=16,
+        fontweight="bold",
+        pad=20
+    )
     ax.set_xlabel("Orderintäkt [SEK]", fontsize=14, labelpad=20)
     ax.set_ylabel("Kategori", fontsize=14, labelpad=20)
     ax.grid(True, axis="x", linewidth=0.3)
@@ -168,10 +185,10 @@ def plot_typical_order(df: pd.DataFrame, unit_counts: pd.DataFrame) -> None:
     if df.empty:
         return
 
-    fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+    _fig, axes = plt.subplots(1, 2, figsize=(14, 5))
 
     # Chart 1: Order value distribution
-    counts, bins, patches = axes[0].hist(
+    _counts, bins, _patches = axes[0].hist(
         df["order_revenue"],
         bins=25,
         color="skyblue",
@@ -206,15 +223,15 @@ def plot_typical_order(df: pd.DataFrame, unit_counts: pd.DataFrame) -> None:
         unit_counts["order_count"],
         color="lightgreen",
         edgecolor="white",
-        )
+    )
 
     axes[1].axvline(
-            df["median_units"].iloc[0],
-            color="green",
-            linestyle="-.",
-            linewidth=2,
-            label=f"Median: {df["median_units"].iloc[0]:.2f}"
-        )
+        df["median_units"].iloc[0],
+        color="green",
+        linestyle="-.",
+        linewidth=2,
+        label=f"Median: {df["median_units"].iloc[0]:.2f}"
+    )
 
     axes[1].axvline(
         df["average_units"].iloc[0],
@@ -237,7 +254,7 @@ def plot_typical_order(df: pd.DataFrame, unit_counts: pd.DataFrame) -> None:
         ax.set_axisbelow(True)
         ax.tick_params(axis="both", labelsize=8)
 
-    fig.suptitle(
+    _fig.suptitle(
         "HUR SER EN TYPISK ORDER UT?",
         fontsize=16,
         fontweight="bold"
