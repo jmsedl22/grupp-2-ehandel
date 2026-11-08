@@ -52,23 +52,14 @@ Responsibilities are divided by file, but subject to change as work progresses.
 - Jacob - ecommerce_sales.ipynb, README.md (documentation), and final check
 
 ## Architecture
-`CommerceAnalyzer` in `src/ecommerce.py` is a single interface to the notebook
-for data loading, reusable calculations and chart generation.
+`CommerceAnalyzer` (`src/ecommerce.py`) loads data and coordinates calculations and presentation.
 
-- `io_utils.py` handles data loading.
-- `metrics.py` implements calculations.
-- `viz.py` implements charts.
-- `CommerceAnalyzer` holds the dataset and coordinates calls to these modules.
-- The notebook formats and displays returned tables and contains the written analysis.
+- `io_utils.py` loads the dataset.
+- `metrics.py` prepares calculation results.
+- `tables.py` formats prepared results as `Styler` tables.
+- `viz.py` renders prepared results as `Figure` objects.
 
-```mermaid
-flowchart TD
-    N("Notebook report file") -->|CommerceAnalyzer| E("ecommerce.py")
-    
-    E -->|Key indicators| M("metrics.py")
-    E -->|Diagrams| V("viz.py")
-    E -->|Data loading| IO("io_utils.py")
-```
+Notebook code cells contains analyzer setup and output calls, and markdown cells contain the analysis.
 
 ## Project structure
 The project structure follows the proposed template given in the assignment description. 
@@ -82,21 +73,8 @@ grupp-2-ehandel/
 │   ├── ecommerce.py          # E-commerce analysis, notebook interface
 │   ├── io_utils.py           # Data loading, file handling
 │   ├── metrics.py            # Sales metric calculations
+│   ├── tables.py             # Styling the tables
 │   └── viz.py                # Charts, visualizations
 ├── .gitignore
 └── README.md
 ```
-
-## Architecture
-The ecommerce.py file contains a class CommerceAnalyzer, that acts as an interface and coordinator to the notebook. It then assists in presenting the results in the report.
-```mermaid
-flowchart TD
-    N("Notebook report file") -->|CommerceAnalyzer| E("ecommerce.py")
-    
-    E -->|Key indicators| M("metrics.py")
-    E -->|Diagrams| V("viz.py")
-    E -->|Data loading| IO("io_utils.py")
-```
-Reusable calculations and chart implementations belong in `src/`.
-The notebook accesses them through `CommerceAnalyzer` and handles table
-presentation and written analysis.
