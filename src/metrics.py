@@ -348,7 +348,8 @@ def order_histogram(
     df: DataFrame,
     bins: int = 25,
 ) -> dict[str, list[float] | list[int]]:
-    """Return histogram bin_edges and counts for combined orders.
+    """
+    Return histogram bin_edges and counts for combined orders.
 
     Each bin includes its left boundary and excludes its right boundary,
     (except the final bin). NumPy determines the range, expanding it
@@ -395,7 +396,8 @@ def order_summary(df: DataFrame) -> dict[str, float]:
 
 
 def large_order_summary(df: DataFrame) -> dict[str, float | int]:
-    """Summarize combined orders strictly above Q3 + 1.5 times IQR.
+    """
+    Summarize combined orders strictly above Q3 + 1.5 times IQR.
 
     Empty input returns a NaN threshold and shares, zero orders, and
     0.0 revenue. Revenue share is NaN when total order revenue is zero.
@@ -438,7 +440,8 @@ def large_order_summary(df: DataFrame) -> dict[str, float | int]:
 
 
 def largest_orders(df: DataFrame, n: int = 5) -> dict[str, DataFrame]:
-    """Return the largest combined orders and rows.
+    """
+    Return the largest combined orders and rows.
 
     The orders table contains rank, order_id, and combined revenue.
     Revenue ties are resolved by ascending order ID, with consecutive ranks.
@@ -645,7 +648,8 @@ def monthly_summary(df: DataFrame) -> DataFrame:
 
 
 def monthly_category_summary(df: DataFrame) -> DataFrame:
-    """Return month, category and revenue in chronological order.
+    """
+    Return month, category and revenue in chronological order.
 
     Observed categories share one monthly range, from the earliest
     to the latest month across the entire input. Missing category labels
