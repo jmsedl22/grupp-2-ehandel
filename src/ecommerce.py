@@ -87,6 +87,10 @@ class CommerceAnalyzer:
         result = metrics.order_summary(self.dataframe)
         return tables.order_summary_table(result, self.settings)
 
+    def anomaly_summary_table(self) -> Styler:
+        result = metrics.large_order_summary(self.dataframe)
+        return tables.anomaly_summary_table(result, self.settings)
+
     def revenue_by_category(self) -> DataFrame:
         return metrics.revenue_by_category(self.dataframe)
 

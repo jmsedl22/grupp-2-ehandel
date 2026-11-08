@@ -253,3 +253,30 @@ def order_summary_table(
         "Orderstatistik",
         numeric_columns=["Värde"],
     )
+
+
+def anomaly_summary_table(
+    summary: Mapping[str, Any],
+    settings: Mapping[str, Any],
+) -> Styler:
+    rows = [
+        ("Övre IQR-gräns", format_amount(summary["threshold"])),
+        ("Antal stora order", format_count(summary["order_count"])),
+        (
+            "Andel av alla order",
+            format_percentage(summary["order_share_pct"]),
+        ),
+        ("Intäkter från stora order", format_amount(summary["revenue"])),
+        (
+            "Andel av totala intäkter",
+            format_percentage(summary["revenue_share_pct"]),
+        ),
+    ]
+    df = pd.DataFrame(rows, columns=["Mätning", "Värde"])
+
+    return _style_table(
+        df,
+        settings,
+        "Stora order över övre IQR-gränsen (Q3 + 1,5 × IQR)",
+        numeric_columns=["Värde"],
+    )
