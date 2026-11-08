@@ -2,8 +2,9 @@ from pathlib import Path
 from typing import TypedDict
 
 from pandas import DataFrame
+from pandas.io.formats.style import Styler
 
-from . import io_utils, metrics, viz
+from . import io_utils, metrics, tables, viz
 
 
 # Return type of the Summary() function as a typed dictionary
@@ -62,6 +63,9 @@ class CommerceAnalyzer:
             "order_count": metrics.count_orders(self.dataframe),
             "aov": metrics.calculate_aov(self.dataframe),
         }
+
+    def summary_table(self) -> Styler:
+        return tables.summary_table(self.summary(), self.settings)
 
     def revenue_by_category(self) -> DataFrame:
         return metrics.revenue_by_category(self.dataframe)

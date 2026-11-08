@@ -112,6 +112,6 @@ def summary_table(
         ("Sålda enheter", format_count(summary["total_units"])),
         ("Unika order", format_count(summary["order_count"])),
         ("Genomsnittligt ordervärde", format_amount(summary["aov"])),
-    ], columns=["Antal", "Värde"])
+    ], columns=["Mätning", "Värde"])
 
     return _style_table(df, settings, "Nyckeltal", numeric_columns=["Värde"])
