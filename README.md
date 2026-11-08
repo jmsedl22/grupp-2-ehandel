@@ -52,7 +52,16 @@ Responsibilities are divided by file, but subject to change as work progresses.
 - Jacob - ecommerce_sales.ipynb, README.md (documentation), and final check
 
 ## Architecture
-`CommerceAnalyzer` (`src/ecommerce.py`) loads data and coordinates calculations and presentation.
+`CommerceAnalyzer` in `src/ecommerce.py` loads data and coordinates calculations and presentation.
+
+```mermaid
+flowchart TD
+    N["Report notebook"] --> E["ecommerce.py"]
+    E --> IO["io_utils.py"]
+    E --> M["metrics.py"]
+    E --> T["tables.py"]
+    E --> V["viz.py"]
+```
 
 - `io_utils.py` loads the dataset.
 - `metrics.py` prepares calculation results.
