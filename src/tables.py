@@ -280,3 +280,50 @@ def anomaly_summary_table(
         "Stora order över övre IQR-gränsen (Q3 + 1,5 × IQR)",
         numeric_columns=["Värde"],
     )
+
+
+def monthly_table(
+    summary: pd.DataFrame,
+    settings: Mapping[str, Any],
+) -> Styler:
+    """Format monthly statistics."""
+    labels = {
+        "month": "Månad",
+        "revenue": "Observerade intäkter",
+        "order_count": "Unika order",
+        "calendar_days": "Kalenderdagar",
+        "observed_days": "Observerade dagar",
+        "coverage_status": "Datumtäckning",
+        "revenue_per_day": "Intäkter per kalenderdag",
+        "aov": "Genomsnittligt ordervärde",
+    }
+
+    coverage_labels = {
+        "all_days_observed": "Alla dagar observerade",
+        "partial": "Delvis observerad",
+        "no_observations": "Inga observationer",
+    }
+
+    numerics = {
+        labels["revenue"]: format_amount,
+        labels["order_count"]: format_count,
+        labels["calendar_days"]: format_count,
+        labels["observed_days"]: format_count,
+        labels["revenue_per_day"]: format_amount,
+        labels["aov"]: format_amount,
+    }
+
+    df = summary[list(labels)].rename(columns=labels)
+
+    coverage_column = labels["coverage_status"]
+    df[coverage_column] = df[coverage_column].map(coverage_labels)
+
+    return _style_table(
+        df,
+        settings,
+        "Månadsöversikt.",
+        numeric_columns=list(numerics),
+    ).format({
+        labels["month"]: format_month,
+        **numerics,
+    }, escape="html")

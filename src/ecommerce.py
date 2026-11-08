@@ -91,6 +91,10 @@ class CommerceAnalyzer:
         result = metrics.large_order_summary(self.dataframe)
         return tables.anomaly_summary_table(result, self.settings)
 
+    def monthly_table(self) -> Styler:
+        result = metrics.monthly_summary(self.dataframe)
+        return tables.monthly_table(result, self.settings)
+
     def revenue_by_category(self) -> DataFrame:
         return metrics.revenue_by_category(self.dataframe)
 
