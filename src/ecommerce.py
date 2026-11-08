@@ -144,6 +144,13 @@ class CommerceAnalyzer:
         city_revenue = metrics.city_summary(self.dataframe)
         return viz.plot_revenue_city(city_revenue, self.settings)
 
+    def plot_revenue_category_city(self) -> Figure:
+        category_revenue = metrics.category_summary(self.dataframe)
+        city_revenue = metrics.city_summary(self.dataframe)
+        return viz.plot_revenue_category_city(
+            category_revenue, city_revenue, self.settings,
+        )
+
     def plot_monthly_revenue(self) -> Figure:
         summary = metrics.monthly_summary(self.dataframe)
         return viz.plot_monthly_revenue(summary, self.settings)

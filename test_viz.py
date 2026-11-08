@@ -112,6 +112,202 @@ def test_city_chart_preserves_missing_labels_and_input(settings):
     pd.testing.assert_frame_equal(summary, original)
 
 
+@pytest.mark.parametrize("category_empty, city_empty", [
+    (False, False), (True, True), (True, False), (False, True),
+])
+def test_combined_revenue_chart_preserves_prepared_panels(
+    settings, category_empty, city_empty,
+):
+    category = pd.DataFrame({
+        "category": [None, np.nan, pd.NA,
+                     "En mycket lång kategori med flera ord som måste radbrytas",
+                     "EttOvanligtLångtSammanhängandeKategorinamnSomRadbryts"],
+        "revenue": [10.0, 1250.5, 0.0, 4.0, 2.0],
+        "share_pct": [np.nan, 50.0, 0.0, pd.NA, None],
+        "original_category": ["original"] * 5,
+        "order_count": [1, 2, 3, 4, 5],
+    }, index=[9, 3, 7, 1, 5])
+    city = pd.DataFrame({
+        "city": ["B", "A"], "revenue": [20.0, 2000.0],
+        "share_pct": [1.0, 99.0], "original_city": ["B", "A"],
+    }, index=[8, 2])
+    if category_empty:
+        category = category.iloc[:0].copy()
+    if city_empty:
+        city = city.iloc[:0].copy()
+    originals = [category.copy(deep=True), city.copy(deep=True)]
+    settings_before = deepcopy(settings)
+    figures_before = plt.get_fignums()
+    rc_before = matplotlib.rcParams.copy()
+    interactive_before = plt.isinteractive()
+
+    fig = viz.plot_revenue_category_city(category, city, settings)
+    fig.canvas.draw()
+
+    assert isinstance(fig, Figure)
+    assert len(fig.axes) == 2
+    top, bottom = fig.axes
+    assert top.get_shared_x_axes().joined(top, bottom)
+    assert top.get_xlim() == pytest.approx(bottom.get_xlim())
+    assert top.xaxis.get_major_formatter() is bottom.xaxis.get_major_formatter()
+    if not (category_empty and city_empty):
+        for ax in fig.axes:
+            assert ax.xaxis.get_major_formatter()(1234.5, 0) == "1 234,50"
+    heights = []
+    for ax, summary, column, title, ylabel, original in zip(
+        fig.axes, [category, city], ["category", "city"],
+        ["Intäkt per kategori", "Intäkt per stad"], ["Kategori", "Stad"],
+        originals, strict=True,
+    ):
+        labels = [
+            fill("Ej angivet" if pd.isna(value) else str(value), width=24)
+            for value in summary[column]
+        ]
+        heights.append(max(
+            settings["figure_size"][1],
+            1.8 + 0.4 * sum(label.count("\n") + 1 for label in labels),
+        ))
+        assert ax.get_title() == title
+        assert ax.get_ylabel() == ylabel
+        assert ax.get_xlabel() == "Intäkt [SEK]"
+        margins = ax.margins()
+        assert margins is not None
+        assert margins[0] == pytest.approx(0.4)
+        widths = []
+        for bar in ax.patches:
+            assert isinstance(bar, Rectangle)
+            widths.append(bar.get_width())
+            assert bar.get_facecolor() == to_rgba(settings["main_color"])
+        np.testing.assert_allclose(
+            np.asarray(widths, dtype=float),
+            np.asarray(summary["revenue"], dtype=float),
+        )
+        if summary.empty:
+            assert not ax.axison
+            assert [text.get_text() for text in ax.texts] == ["Inga data"]
+        else:
+            assert ax.yaxis_inverted()
+            assert [tick.get_text() for tick in ax.get_yticklabels()] == labels
+            assert any(line.get_visible() for line in ax.get_xgridlines())
+            assert not any(line.get_visible() for line in ax.get_ygridlines())
+            expected = [] if column == "city" else [
+                "10,00 SEK (—)", "1 250,50 SEK (50,00 %)",
+                "0,00 SEK (0,00 %)", "4,00 SEK (—)", "2,00 SEK (—)",
+            ]
+            assert [text.get_text() for text in ax.texts] == expected
+        pd.testing.assert_frame_equal(summary, original)
+    assert tuple(fig.get_size_inches()) == pytest.approx((
+        settings["figure_size"][0], sum(heights),
+    ))
+    subplotspec = top.get_subplotspec()
+    assert subplotspec is not None
+    np.testing.assert_allclose(
+        np.asarray(subplotspec.get_gridspec().get_height_ratios(), dtype=float),
+        heights,
+    )
+    if city_empty and not category_empty:
+        assert top.get_xticklabels()
+        assert all(tick.get_visible() for tick in top.get_xticklabels())
+        assert any(tick.get_text() for tick in top.get_xticklabels())
+    assert settings == settings_before
+    assert plt.get_fignums() == figures_before
+    assert matplotlib.rcParams == rc_before
+    assert plt.isinteractive() == interactive_before
+    assert isinstance(plt.show, Mock)
+    plt.show.assert_not_called()
+
+
+@pytest.mark.parametrize("column", ["category", "city"])
+@pytest.mark.parametrize("minimum_height", [4.0, 12.0])
+@pytest.mark.parametrize("zero_total", [False, True])
+def test_standalone_revenue_bars_wrap_size_and_annotate(
+    settings, column, minimum_height, zero_total,
+):
+    settings = {**settings, "figure_size": (7.0, minimum_height)}
+    summary = pd.DataFrame({
+        column: [None, "En mycket lång ursprunglig etikett med många ord " * 4],
+        "revenue": [0.0, 0.0] if zero_total else [12.5, 1250.0],
+        "share_pct": [np.nan, pd.NA] if zero_total else [np.nan, 99.0],
+        f"original_{column}": ["missing", "original long label"],
+        "order_count": [3, 4],
+    }, index=[7, 2])
+    original = summary.copy(deep=True)
+    settings_before = deepcopy(settings)
+    labels = ["Ej angivet", fill(summary[column].iloc[1], width=24)]
+    figures_before = plt.get_fignums()
+
+    if column == "category":
+        fig = viz.plot_revenue_category(
+            summary, settings, pd.Timestamp("2024-01-02"), pd.Timestamp("2024-03-04"),
+        )
+    else:
+        fig = viz.plot_revenue_city(summary, settings)
+    fig.canvas.draw()
+    ax = fig.axes[0]
+
+    assert [tick.get_text() for tick in ax.get_yticklabels()] == labels
+    assert tuple(fig.get_size_inches()) == pytest.approx((
+        7.0, max(minimum_height, 1.8 + 0.4 * sum(
+            label.count("\n") + 1 for label in labels
+        )),
+    ))
+    if column == "category":
+        assert ax.get_title() == "Intäkt per kategori\n2024-01-02 – 2024-03-04"
+        assert ax.get_xlabel() == "Intäkt"
+        assert ax.get_ylabel() == "Kategori"
+        margins = ax.margins()
+        assert margins is not None
+        assert margins[0] == pytest.approx(0.4)
+        assert [text.get_text() for text in ax.texts] == (
+            ["0,00 SEK (—)", "0,00 SEK (—)"] if zero_total else
+            ["12,50 SEK (—)", "1 250,00 SEK (99,00 %)"]
+        )
+    else:
+        assert ax.get_title() == "Intäkt per stad"
+        assert ax.get_xlabel() == "Intäkt [SEK]"
+        assert ax.get_ylabel() == "Stad"
+        assert not ax.texts
+    pd.testing.assert_frame_equal(summary, original)
+    assert settings == settings_before
+    assert plt.get_fignums() == figures_before
+    assert isinstance(plt.show, Mock)
+    plt.show.assert_not_called()
+
+
+@pytest.mark.parametrize("empty", [False, True])
+def test_analyzer_combined_revenue_forwards_summaries(settings, monkeypatch, empty):
+    analyzer = CommerceAnalyzer.__new__(CommerceAnalyzer)
+    analyzer.dataframe = pd.DataFrame({
+        "category": ["B", None, "A"], "city": [None, "X", "X"],
+        "revenue": [5.0, 10.0, 20.0], "order_id": ["A", "A", "B"],
+    })
+    if empty:
+        analyzer.dataframe = analyzer.dataframe.iloc[:0].copy()
+    analyzer.settings = settings
+    original = analyzer.dataframe.copy(deep=True)
+    settings_before = deepcopy(settings)
+    expected = [metrics.category_summary(original), metrics.city_summary(original)]
+    prepare = [Mock(wraps=metrics.category_summary), Mock(wraps=metrics.city_summary)]
+    monkeypatch.setattr(metrics, "category_summary", prepare[0])
+    monkeypatch.setattr(metrics, "city_summary", prepare[1])
+    render = Mock(wraps=viz.plot_revenue_category_city)
+    monkeypatch.setattr(viz, "plot_revenue_category_city", render)
+
+    fig = analyzer.plot_revenue_category_city()
+    fig.canvas.draw()
+
+    assert isinstance(fig, Figure)
+    assert len(fig.axes) == 2
+    render.assert_called_once()
+    assert render.call_args.args[2] is settings
+    for spy, supplied, summary in zip(prepare, render.call_args.args[:2], expected):
+        spy.assert_called_once()
+        assert spy.call_args.args[0] is analyzer.dataframe
+        pd.testing.assert_frame_equal(supplied, summary)
+    pd.testing.assert_frame_equal(analyzer.dataframe, original)
+    assert settings == settings_before
+
+
 @pytest.mark.parametrize("plotter, columns", [
     (viz.plot_revenue_city, ["city", "revenue", "share_pct"]),
     (viz.plot_monthly_revenue, [

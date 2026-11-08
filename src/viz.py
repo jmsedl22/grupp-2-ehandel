@@ -99,6 +99,52 @@ def _empty_chart(ax: Axes) -> None:
     ax.set_axis_off()
 
 
+def _revenue_labels(summary: pd.DataFrame, column: str) -> list[str]:
+    return [
+        fill("Ej angivet" if pd.isna(value) else str(value), width=24)
+        for value in summary[column]
+    ]
+
+
+def _draw_revenue_bars(
+    ax: Axes,
+    summary: pd.DataFrame,
+    column: str,
+    settings: Mapping[str, Any],
+    annotate: bool = False,
+) -> None:
+    if summary.empty:
+        _empty_chart(ax)
+        return
+
+    positions = range(len(summary))
+    bars = ax.barh(
+        positions,
+        summary["revenue"],
+        color=settings["main_color"],
+    )
+    ax.set_yticks(positions, labels=_revenue_labels(summary, column))
+
+    if annotate:
+        annotations = [
+            f"{_format_number(revenue)} SEK "
+            f"({_format_percentage(share)})"
+            for revenue, share in zip(
+                summary["revenue"], summary["share_pct"], strict=True,
+            )
+        ]
+        ax.bar_label(bars, labels=annotations, padding=5)
+        ax.margins(x=0.4)
+
+    ax.xaxis.set_major_formatter(
+        ticker.FuncFormatter(
+            lambda value, _position: _format_number(value)
+        )
+    )
+    ax.grid(True, axis="x")
+    ax.invert_yaxis()
+
+
 def plot_revenue_category(
     category_revenue: pd.DataFrame,
     settings: Mapping[str, Any],
@@ -106,14 +152,7 @@ def plot_revenue_category(
     date_max: Any,
 ) -> Figure:
     """Plot prepared category revenue and shares for the dataset period."""
-    labels = [
-        fill(
-            "Ej angivet" if pd.isna(category) else str(category),
-            width=24,
-        )
-        for category in category_revenue["category"]
-    ]
-
+    labels = _revenue_labels(category_revenue, "category")
     width, height = settings["figure_size"]
     line_count = sum(label.count("\n") + 1 for label in labels)
     height = max(height, 1.8 + 0.4 * line_count)
@@ -125,38 +164,9 @@ def plot_revenue_category(
         )
         ax.set_xlabel("Intäkt")
         ax.set_ylabel("Kategori")
-
-        if category_revenue.empty:
-            _empty_chart(ax)
-            return fig
-
-        positions = range(len(category_revenue))
-        bars = ax.barh(
-            positions,
-            category_revenue["revenue"],
-            color=settings["main_color"],
+        _draw_revenue_bars(
+            ax, category_revenue, "category", settings, annotate=True,
         )
-        ax.set_yticks(positions, labels=labels)
-
-        annotations = [
-            f"{_format_number(revenue)} SEK "
-            f"({_format_percentage(share)})"
-            for revenue, share in zip(
-                category_revenue["revenue"],
-                category_revenue["share_pct"],
-            )
-        ]
-        ax.bar_label(bars, labels=annotations, padding=5)
-
-        ax.xaxis.set_major_formatter(
-            ticker.FuncFormatter(
-                lambda value, _position: _format_number(value)
-            )
-        )
-        ax.margins(x=0.4)
-        ax.grid(True, axis="x")
-        ax.invert_yaxis()
-
         return fig
 
 
@@ -165,33 +175,59 @@ def plot_revenue_city(
     settings: Mapping[str, Any],
 ) -> Figure:
     """Create a revenue chart from the prepared city summary."""
-    with _chart(settings) as (fig, ax):
+    labels = _revenue_labels(city_revenue, "city")
+    width, height = settings["figure_size"]
+    line_count = sum(label.count("\n") + 1 for label in labels)
+    height = max(height, 1.8 + 0.4 * line_count)
+
+    with _chart(settings, figsize=(width, height)) as (fig, ax):
         ax.set_title("Intäkt per stad")
         ax.set_xlabel("Intäkt [SEK]")
         ax.set_ylabel("Stad")
+        _draw_revenue_bars(ax, city_revenue, "city", settings)
+        return fig
 
-        if city_revenue.empty:
-            _empty_chart(ax)
-        else:
-            positions = range(len(city_revenue))
-            labels = [
-                "Ej angivet" if pd.isna(city) else str(city)
-                for city in city_revenue["city"]
-            ]
 
-            ax.barh(
-                positions,
-                city_revenue["revenue"],
-                color=settings["main_color"],
+def plot_revenue_category_city(
+    category_revenue: pd.DataFrame,
+    city_revenue: pd.DataFrame,
+    settings: Mapping[str, Any],
+) -> Figure:
+    """Draw prepared category and city revenues in a shared figure."""
+    panels = [
+        (category_revenue, "category", "Intäkt per kategori", "Kategori"),
+        (city_revenue, "city", "Intäkt per stad", "Stad"),
+    ]
+    width, height = settings["figure_size"]
+    heights = [
+        max(
+            height,
+            1.8 + 0.4 * sum(
+                label.count("\n") + 1
+                for label in _revenue_labels(summary, column)
+            ),
+        )
+        for summary, column, _, _ in panels
+    ]
+
+    with _chart(
+        settings,
+        nrows=2,
+        figsize=(width, sum(heights)),
+        height_ratios=heights,
+        sharex=True,
+    ) as (fig, axes):
+        for ax, (summary, column, title, group_label) in zip(
+            axes, panels, strict=True,
+        ):
+            ax.set_title(title)
+            ax.set_xlabel("Intäkt [SEK]")
+            ax.set_ylabel(group_label)
+            _draw_revenue_bars(
+                ax, summary, column, settings, annotate=(column == "category"),
             )
-            ax.set_yticks(positions, labels=labels)
-            ax.xaxis.set_major_formatter(
-                ticker.FuncFormatter(
-                    lambda value, _position: _format_number(value)
-                )
-            )
-            ax.grid(True, axis="x")
-            ax.invert_yaxis()
+            ax.margins(x=0.4)
+            ax.tick_params(axis="x", labelbottom=True)
 
         return fig
 
