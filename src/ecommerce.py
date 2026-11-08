@@ -126,9 +126,19 @@ class CommerceAnalyzer:
     def revenue_by_city(self) -> DataFrame:
         return metrics.revenue_by_city(self.dataframe)
 
-    def plot_revenue_category(self) -> None:
-        category_revenue = self.revenue_by_category()
-        viz.plot_revenue_category(category_revenue)
+    def plot_revenue_by_category(self) -> Figure:
+        category_revenue = metrics.category_summary(self.dataframe)
+        overview = metrics.data_overview(self.dataframe)
+
+        return viz.plot_revenue_category(
+            category_revenue,
+            self.settings,
+            overview["date_min"],
+            overview["date_max"],
+        )
+
+    def plot_revenue_category(self) -> Figure:
+        return self.plot_revenue_by_category()
 
     def plot_revenue_city(self) -> Figure:
         city_revenue = metrics.city_summary(self.dataframe)

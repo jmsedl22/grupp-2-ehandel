@@ -1,6 +1,7 @@
 from collections.abc import Generator, Mapping
 from contextlib import contextmanager
 from math import isfinite
+from textwrap import fill
 from typing import Any
 
 import matplotlib.dates as mdates
@@ -63,6 +64,18 @@ def _format_number(value: Any, decimals: int = 2) -> str:
     return f"{value:,.{decimals}f}".replace(",", " ").replace(".", ",")
 
 
+def _format_date(value: Any) -> str:
+    if pd.isna(value):
+        return "—"
+
+    return pd.Timestamp(value).strftime("%Y-%m-%d")
+
+
+def _format_percentage(value: Any) -> str:
+    formatted = _format_number(value)
+    return "—" if formatted == "—" else f"{formatted} %"
+
+
 def _empty_chart(ax: Axes) -> None:
     ax.text(
         0.5, 0.5, "Inga data",
@@ -73,22 +86,66 @@ def _empty_chart(ax: Axes) -> None:
     ax.set_axis_off()
 
 
-def plot_revenue_category(category_revenue) -> None:
-    """
-    Creates a bar chart for total revenue by product category
-    """
-    _fig, ax = plt.subplots(figsize=(8, 5), constrained_layout=True)
+def plot_revenue_category(
+    category_revenue: pd.DataFrame,
+    settings: Mapping[str, Any],
+    date_min: Any,
+    date_max: Any,
+) -> Figure:
+    """Plot prepared category revenue and shares for the dataset period."""
+    labels = [
+        fill(
+            "Ej angivet" if pd.isna(category) else str(category),
+            width=24,
+        )
+        for category in category_revenue["category"]
+    ]
 
-    ax.barh(category_revenue["category"], category_revenue["revenue"] ,color="turquoise")
-    ax.set_title("Intäkt per kategori", fontsize=16, fontweight= "bold", pad=20)
-    ax.set_xlabel("Intäkt [SEK]", fontsize=14, labelpad=20)
-    ax.xaxis.set_major_formatter(ticker.EngFormatter(unit=""))
-    ax.set_ylabel("Kategori", fontsize=14)
-    ax.grid(True, axis="x", linewidth=0.3)
-    ax.invert_yaxis()
-    ax.set_axisbelow(True)
+    width, height = settings["figure_size"]
+    height = max(
+        height,
+        1.8 + 0.4 * sum(label.count("\n") + 1 for label in labels),
+    )
 
-    plt.show()
+    with _chart(settings, figsize=(width, height)) as (fig, ax):
+        ax.set_title(
+            "Intäkt per kategori\n"
+            f"{_format_date(date_min)} – {_format_date(date_max)}"
+        )
+        ax.set_xlabel("Intäkt")
+        ax.set_ylabel("Kategori")
+
+        if category_revenue.empty:
+            _empty_chart(ax)
+        else:
+            positions = range(len(category_revenue))
+            bars = ax.barh(
+                positions,
+                category_revenue["revenue"],
+                color=settings["main_color"],
+            )
+            ax.set_yticks(positions, labels=labels)
+
+            annotations = [
+                f"{_format_number(revenue)} SEK "
+                f"({_format_percentage(share)})"
+                for revenue, share in zip(
+                    category_revenue["revenue"],
+                    category_revenue["share_pct"],
+                )
+            ]
+            ax.bar_label(bars, labels=annotations, padding=5)
+
+            ax.xaxis.set_major_formatter(
+                ticker.FuncFormatter(
+                    lambda value, _position: _format_number(value)
+                )
+            )
+            ax.margins(x=0.4)
+            ax.grid(True, axis="x")
+            ax.invert_yaxis()
+
+        return fig
 
 
 def plot_revenue_city(
@@ -200,7 +257,8 @@ def plot_order_value_distribution(df: pd.DataFrame) -> None:
             va="bottom"
         )
 
-    ax.set_title("Fördelning av ordervärden", fontsize=16, fontweight= "bold", pad=20)
+    ax.set_title(
+        "Fördelning av ordervärden", fontsize=16, fontweight= "bold", pad=20)
     ax.set_xlabel("Orderintäkt intervall [SEK]", fontsize=14, labelpad=20)
     ax.set_ylabel("Antal beställningar", fontsize=14, labelpad=20)
     ax.tick_params(axis="x", rotation=15)
