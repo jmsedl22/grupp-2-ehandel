@@ -158,8 +158,10 @@ class CommerceAnalyzer:
             self.settings,
         )
 
-    def plot_revenue_distribution_city(self) -> None:
-        viz.plot_revenue_distribution_city(self.dataframe)
+    def plot_revenue_distribution_city(self) -> Figure:
+        summary = metrics.revenue_boxplot_summary(self.dataframe, "city")
+        return viz.plot_revenue_distribution_city(summary, self.settings)
 
-    def plot_revenue_distribution_category(self) -> None:
-        viz.plot_revenue_distribution_category(self.dataframe)
+    def plot_revenue_distribution_category(self) -> Figure:
+        summary = metrics.revenue_boxplot_summary(self.dataframe, "category")
+        return viz.plot_revenue_distribution_category(summary, self.settings)

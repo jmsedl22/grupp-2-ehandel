@@ -1,4 +1,4 @@
-from collections.abc import Generator, Mapping
+from collections.abc import Generator, Mapping, Sequence
 from contextlib import contextmanager
 from itertools import pairwise
 from math import isfinite
@@ -314,79 +314,79 @@ def plot_order_value_distribution(
         return fig
 
 
-def plot_revenue_distribution_city(df: pd.DataFrame) -> None:
-    """
-    Creates a box plot for revenue distribution by city
-    """
-    revenue_groups = df.groupby("city")["revenue"]
-    cities = revenue_groups.median().sort_values(ascending=True).index
-    revenue_by_city = [
-        revenue_groups.get_group(city)
-        for city in cities
+def _revenue_boxplot(
+    summary: Sequence[Mapping[str, Any]],
+    settings: Mapping[str, Any],
+    title: str,
+    group_label: str,
+) -> Figure:
+    """Render revenue boxplots."""
+    stats = [
+        {
+            **item,
+            "label": fill(
+                "Ej angivet" if pd.isna(item["label"]) else str(item["label"]),
+                width=24,
+            ),
+        }
+        for item in summary
     ]
 
-    _fig, ax = plt.subplots(figsize=(8, 5), constrained_layout=True)
-    bp = ax.boxplot(
-        revenue_by_city,
-        tick_labels=[str(city) for city in cities],
-        orientation="horizontal",
-        patch_artist=True,
+    width, height = settings["figure_size"]
+    line_count = sum(item["label"].count("\n") + 1 for item in stats)
+    height = max(height, 1.8 + 0.4 * line_count)
+
+    with _chart(settings, figsize=(width, height)) as (fig, ax):
+        ax.set_title(title)
+        ax.set_xlabel("Radintäkt [SEK]")
+        ax.set_ylabel(group_label)
+
+        if not stats:
+            _empty_chart(ax)
+            return fig
+
+        bp = ax.bxp(
+            stats,
+            orientation="horizontal",
+            patch_artist=True,
+        )
+        for box in bp["boxes"]:
+            box.set_facecolor(settings["main_color"])
+        for cap in bp["caps"]:
+            cap.set(linewidth=2)
+        for median in bp["medians"]:
+            median.set(color=settings["median_color"], linewidth=3)
+        for flier in bp["fliers"]:
+            flier.set(alpha=0.5)
+
+        ax.xaxis.set_major_formatter(
+            ticker.FuncFormatter(
+                lambda value, _position: _format_number(value)
+            )
+        )
+        ax.grid(True, axis="x")
+
+        return fig
+
+
+def plot_revenue_distribution_city(
+    summary: Sequence[Mapping[str, Any]],
+    settings: Mapping[str, Any],
+) -> Figure:
+    """Render prepared city row-revenue distributions."""
+    return _revenue_boxplot(
+        summary, settings, "Intäktsfördelning per stad", "Stad",
     )
-    colors = ["lightcyan", "lightblue", "dodgerblue", "steelblue", "darkblue"]
-    for patch, color in zip(bp["boxes"], colors):
-        patch.set_facecolor(color)
-    for cap in bp['caps']:
-        cap.set(linewidth=2)
-    for median in bp['medians']:
-        median.set(linewidth=3)
-    for flier in bp['fliers']:
-        flier.set(alpha=0.5)
-
-    ax.set_title("Intäktsfördelning per stad", fontsize=16, fontweight="bold", pad=20)
-    ax.set_xlabel("Orderintäkt [SEK]", fontsize=14, labelpad=20)
-    ax.set_ylabel("Stad", fontsize=14, labelpad=20)
-    ax.grid(True, axis="x", linewidth=0.3)
-
-    plt.show()
 
 
-def plot_revenue_distribution_category(df: pd.DataFrame) -> None:
-    """Creates a box plot for revenue distribution by category."""
-    revenue_groups = df.groupby("category")["revenue"]
-    categories = revenue_groups.median().sort_values(ascending=True).index
-    revenue_by_category = [
-        revenue_groups.get_group(category)
-        for category in categories
-    ]
-
-    _fig, ax = plt.subplots(figsize=(8, 5), constrained_layout=True)
-    bp = ax.boxplot(
-        revenue_by_category,
-        tick_labels=[str(category) for category in categories],
-        orientation="horizontal",
-        patch_artist=True,
+def plot_revenue_distribution_category(
+    summary: Sequence[Mapping[str, Any]],
+    settings: Mapping[str, Any],
+) -> Figure:
+    """Render prepared category row-revenue distributions."""
+    return _revenue_boxplot(
+        summary, settings, "Intäktsfördelning per kategori", "Kategori",
     )
-    colors = ["thistle", "plum", "mediumorchid", "blueviolet", "indigo"]
-    for patch, color in zip(bp["boxes"], colors):
-        patch.set_facecolor(color)
-    for cap in bp['caps']:
-        cap.set(linewidth = 2)
-    for median in bp['medians']:
-        median.set(linewidth = 3)
-    for flier in bp['fliers']:
-        flier.set(alpha = 0.5)
-
-    ax.set_title(
-        "Intäktsfördelning per kategori",
-        fontsize=16,
-        fontweight="bold",
-        pad=20
-    )
-    ax.set_xlabel("Orderintäkt [SEK]", fontsize=14, labelpad=20)
-    ax.set_ylabel("Kategori", fontsize=14, labelpad=20)
-    ax.grid(True, axis="x", linewidth=0.3)
-
-    plt.show()
 
 
 def plot_typical_order(df: pd.DataFrame, unit_counts: pd.DataFrame) -> None:

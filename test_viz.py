@@ -1,15 +1,18 @@
 import warnings
 from copy import deepcopy
-from unittest.mock import Mock
+from textwrap import fill
+from typing import Any
+from unittest.mock import Mock, patch
 
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pytest
+from matplotlib.axes import Axes
 from matplotlib.colors import to_rgba
 from matplotlib.figure import Figure
-from matplotlib.patches import Rectangle
+from matplotlib.patches import PathPatch, Rectangle
 
 from src import metrics, viz
 from src.ecommerce import CommerceAnalyzer
@@ -373,19 +376,335 @@ def test_analyzer_order_distribution_uses_combined_orders(settings, empty):
     (viz.plot_revenue_distribution_city, "city"),
     (viz.plot_revenue_distribution_category, "category"),
 ])
-def test_boxplots_are_horizontal_without_warnings(plotter, group_column):
+def test_boxplots_are_horizontal_without_warnings(settings, plotter, group_column):
     source = pd.DataFrame({
         group_column: ["A", "A", "B", "B"],
         "revenue": [10.0, 20.0, 30.0, 40.0],
     })
+    summary = metrics.revenue_boxplot_summary(source, group_column)
+    original = deepcopy(summary)
+    figures_before = plt.get_fignums()
+    rc_before = matplotlib.rcParams.copy()
+    interactive_before = plt.isinteractive()
 
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        plotter(source)
-        fig = plt.gcf()
+        fig = plotter(summary, settings)
         fig.canvas.draw()
 
-    assert len(fig.axes[0].patches) == 2
-    for patch in fig.axes[0].patches:
-        vertices = np.asarray(patch.get_path().vertices, dtype=float)
+    assert isinstance(fig, Figure)
+    ax = fig.axes[0]
+    assert ax.get_xlabel() == "Radintäkt [SEK]"
+    assert ax.get_ylabel() == {"city": "Stad", "category": "Kategori"}[group_column]
+    assert ax.get_title() == {
+        "city": "Intäktsfördelning per stad",
+        "category": "Intäktsfördelning per kategori",
+    }[group_column]
+    assert tuple(fig.get_size_inches()) == pytest.approx(settings["figure_size"])
+    assert ax.get_facecolor() == to_rgba(settings["background_color"])
+    assert len(ax.patches) == 2
+    for box in ax.patches:
+        assert isinstance(box, PathPatch)
+        vertices = np.asarray(box.get_path().vertices, dtype=float)
         assert np.ptp(vertices[:, 0]) > np.ptp(vertices[:, 1])
+    assert plt.get_fignums() == figures_before
+    assert matplotlib.rcParams == rc_before
+    assert plt.isinteractive() == interactive_before
+    assert isinstance(plt.show, Mock)
+    plt.show.assert_not_called()
+    pd.testing.assert_frame_equal(pd.DataFrame(summary), pd.DataFrame(original))
+
+
+@pytest.mark.parametrize("plotter", [
+    viz.plot_revenue_distribution_city,
+    viz.plot_revenue_distribution_category,
+])
+def test_boxplots_handle_empty_summaries(settings, plotter):
+    summary = []
+    figures_before = plt.get_fignums()
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        fig = plotter(summary, settings)
+        fig.canvas.draw()
+
+    assert isinstance(fig, Figure)
+    ax = fig.axes[0]
+    assert not ax.axison
+    assert [text.get_text() for text in ax.texts] == ["Inga data"]
+    assert len(ax.patches) == 0
+    assert len(ax.lines) == 0
+    assert ax.get_legend() is None
+    assert tuple(fig.get_size_inches()) == pytest.approx(settings["figure_size"])
+    assert summary == []
+    assert plt.get_fignums() == figures_before
+    assert isinstance(plt.show, Mock)
+    plt.show.assert_not_called()
+
+
+@pytest.mark.parametrize("plotter", [
+    viz.plot_revenue_distribution_city,
+    viz.plot_revenue_distribution_category,
+])
+@pytest.mark.parametrize("minimum_height", [4.0, 12.0])
+def test_boxplots_wrap_original_missing_and_long_labels(
+    settings, plotter, minimum_height,
+):
+    settings = {**settings, "figure_size": (7.0, minimum_height)}
+    labels = [
+        None,
+        np.nan,
+        pd.NA,
+        (
+            "En mycket lång ursprunglig etikett med flera ord som måste radbrytas "
+            "utan att någon del av det ursprungliga namnet försvinner"
+        ),
+        "EttOvanligtLångtSammanhängandeNamnSomOcksåMåsteRadbrytas",
+    ]
+    summary: list[dict[str, Any]] = [
+        {
+            "label": label, "med": 5.0, "q1": 3.0, "q3": 7.0,
+            "whislo": 1.0, "whishi": 9.0, "fliers": [20.0],
+        }
+        for label in labels
+    ]
+    original = deepcopy(summary)
+    flier_lists = [item["fliers"] for item in summary]
+    expected_labels = [
+        fill("Ej angivet" if pd.isna(label) else str(label), width=24)
+        for label in labels
+    ]
+    figures_before = plt.get_fignums()
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        fig = plotter(tuple(summary), settings)
+        fig.canvas.draw()
+
+    ax = fig.axes[0]
+    assert [tick.get_text() for tick in ax.get_yticklabels()] == expected_labels
+    assert all(
+        len(line) <= 24 for label in expected_labels for line in label.splitlines()
+    )
+    line_count = sum(label.count("\n") + 1 for label in expected_labels)
+    assert tuple(fig.get_size_inches()) == pytest.approx((
+        7.0, max(minimum_height, 1.8 + 0.4 * line_count),
+    ))
+    pd.testing.assert_frame_equal(pd.DataFrame(summary), pd.DataFrame(original))
+    assert all(
+        item["fliers"] is fliers for item, fliers in zip(summary, flier_lists)
+    )
+    assert plt.get_fignums() == figures_before
+    assert isinstance(plt.show, Mock)
+    plt.show.assert_not_called()
+
+
+@pytest.mark.parametrize("plotter", [
+    viz.plot_revenue_distribution_city,
+    viz.plot_revenue_distribution_category,
+])
+def test_boxplots_draw_exact_prepared_statistics_and_styles(settings, plotter):
+    # Deliberately not median-sorted; these values must not be recomputed.
+    summary: list[dict[str, Any]] = [
+        {
+            "label": "High", "med": 50.0, "q1": 40.0, "q3": 65.0,
+            "whislo": 20.0, "whishi": 80.0, "fliers": [110.0, -5.0],
+        },
+        {
+            "label": None, "med": -10.0, "q1": -20.0, "q3": -2.0,
+            "whislo": -30.0, "whishi": 5.0, "fliers": [-60.0],
+        },
+        {
+            "label": "Constant", "med": 7.0, "q1": 7.0, "q3": 7.0,
+            "whislo": 7.0, "whishi": 7.0, "fliers": [],
+        },
+    ]
+    original = deepcopy(summary)
+    figures_before = plt.get_fignums()
+
+    with (
+        patch.object(Axes, "bxp", autospec=True, side_effect=Axes.bxp) as bxp,
+        patch.object(
+            Axes, "boxplot", side_effect=AssertionError("Use prepared statistics"),
+        ),
+        warnings.catch_warnings(),
+    ):
+        warnings.simplefilter("error")
+        fig = plotter(summary, settings)
+        fig.canvas.draw()
+
+    bxp.assert_called_once()
+    assert bxp.call_args.kwargs["orientation"] == "horizontal"
+    assert bxp.call_args.kwargs["patch_artist"] is True
+    supplied_stats = bxp.call_args.args[1]
+    expected_stats = deepcopy(original)
+    expected_stats[1]["label"] = "Ej angivet"
+    pd.testing.assert_frame_equal(
+        pd.DataFrame(supplied_stats), pd.DataFrame(expected_stats),
+    )
+    assert all(
+        supplied is not source and supplied["fliers"] is source["fliers"]
+        for supplied, source in zip(supplied_stats, summary)
+    )
+
+    ax = fig.axes[0]
+    assert [tick.get_text() for tick in ax.get_yticklabels()] == [
+        "High", "Ej angivet", "Constant",
+    ]
+    assert len(ax.patches) == 3
+    assert len(ax.lines) == 18
+    for index, (box, stats) in enumerate(zip(ax.patches, original)):
+        assert isinstance(box, PathPatch)
+        vertices = np.asarray(box.get_path().vertices, dtype=float)
+        assert vertices[:, 0].min() == pytest.approx(stats["q1"])
+        assert vertices[:, 0].max() == pytest.approx(stats["q3"])
+        assert np.ptp(vertices[:, 1]) > 0
+        position = index + 1
+        assert (vertices[:, 1].min() + vertices[:, 1].max()) / 2 == pytest.approx(
+            position,
+        )
+        assert box.get_facecolor() == to_rgba(settings["main_color"])
+        low_whisker, high_whisker, low_cap, high_cap, median, flier = (
+            ax.lines[6 * index:6 * (index + 1)]
+        )
+        for line, expected_x in [
+            (low_whisker, [stats["q1"], stats["whislo"]]),
+            (high_whisker, [stats["q3"], stats["whishi"]]),
+            (low_cap, [stats["whislo"], stats["whislo"]]),
+            (high_cap, [stats["whishi"], stats["whishi"]]),
+            (median, [stats["med"], stats["med"]]),
+            (flier, stats["fliers"]),
+        ]:
+            np.testing.assert_allclose(
+                np.asarray(line.get_xdata(), dtype=float), expected_x,
+            )
+        for line in (low_whisker, high_whisker, flier):
+            np.testing.assert_allclose(
+                np.asarray(line.get_ydata(), dtype=float),
+                np.full(len(np.asarray(line.get_xdata())), position),
+            )
+        for line in (low_cap, high_cap, median):
+            y = np.asarray(line.get_ydata(), dtype=float)
+            assert y.min() < position < y.max()
+        assert median.get_linewidth() == 3
+        assert to_rgba(median.get_color()) == to_rgba(settings["median_color"])
+        assert low_cap.get_linewidth() == high_cap.get_linewidth() == 2
+        assert flier.get_alpha() == 0.5
+
+    pd.testing.assert_frame_equal(pd.DataFrame(summary), pd.DataFrame(original))
+    assert plt.get_fignums() == figures_before
+    assert isinstance(plt.show, Mock)
+    plt.show.assert_not_called()
+
+
+@pytest.mark.parametrize("method_name, group_column", [
+    ("plot_revenue_distribution_city", "city"),
+    ("plot_revenue_distribution_category", "category"),
+])
+@pytest.mark.parametrize("empty", [False, True])
+def test_analyzer_boxplots_use_raw_row_revenue_summary(
+    settings, monkeypatch, method_name, group_column, empty,
+):
+    analyzer = CommerceAnalyzer.__new__(CommerceAnalyzer)
+    analyzer.dataframe = pd.DataFrame({
+        "order_id": ["Repeated"] * 5 + ["B", "B", "C", "C"],
+        group_column: ["A"] * 5 + ["B", "B", None, None],
+        "revenue": [1.0, 2.0, 3.0, 4.0, 100.0, 10.0, 30.0, 6.0, 8.0],
+    })
+    if empty:
+        analyzer.dataframe = analyzer.dataframe.iloc[:0].copy()
+    analyzer.settings = settings
+    original = analyzer.dataframe.copy(deep=True)
+    expected = metrics.revenue_boxplot_summary(analyzer.dataframe, group_column)
+    prepare = Mock(wraps=metrics.revenue_boxplot_summary)
+    render = Mock(wraps=getattr(viz, method_name))
+    monkeypatch.setattr(metrics, "revenue_boxplot_summary", prepare)
+    monkeypatch.setattr(viz, method_name, render)
+    figures_before = plt.get_fignums()
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        fig = getattr(analyzer, method_name)()
+        fig.canvas.draw()
+
+    assert isinstance(fig, Figure)
+    prepare.assert_called_once()
+    assert prepare.call_args.args[0] is analyzer.dataframe
+    assert prepare.call_args.args[1] == group_column
+    render.assert_called_once()
+    assert render.call_args.args[1] is settings
+    pd.testing.assert_frame_equal(
+        pd.DataFrame(render.call_args.args[0]), pd.DataFrame(expected),
+    )
+    ax = fig.axes[0]
+    if empty:
+        assert expected == []
+        assert not ax.axison
+        assert [text.get_text() for text in ax.texts] == ["Inga data"]
+        assert len(ax.patches) == len(ax.lines) == 0
+    else:
+        assert expected[0] == {
+            "label": "A", "med": 3.0, "q1": 2.0, "q3": 4.0,
+            "whislo": 1.0, "whishi": 4.0, "fliers": [100.0],
+        }
+        assert len(ax.patches) == len(expected) == 3
+        medians = ax.lines[4::6]
+        assert len(medians) == len(expected)
+        for median, stats in zip(medians, expected):
+            np.testing.assert_allclose(
+                np.asarray(median.get_xdata(), dtype=float),
+                np.asarray([stats["med"], stats["med"]], dtype=float),
+            )
+        assert [tick.get_text() for tick in ax.get_yticklabels()] == [
+            "A", "Ej angivet", "B",
+        ]
+    pd.testing.assert_frame_equal(analyzer.dataframe, original)
+    assert plt.get_fignums() == figures_before
+    assert isinstance(plt.show, Mock)
+    plt.show.assert_not_called()
+
+
+@pytest.mark.parametrize("method_name, group_column", [
+    ("plot_revenue_distribution_city", "city"),
+    ("plot_revenue_distribution_category", "category"),
+])
+@pytest.mark.parametrize("invalid", [
+    "missing_column", "non_numeric", "missing", "infinite",
+])
+def test_analyzer_boxplots_delegate_validation(
+    settings, monkeypatch, method_name, group_column, invalid,
+):
+    analyzer = CommerceAnalyzer.__new__(CommerceAnalyzer)
+    analyzer.settings = settings
+    analyzer.dataframe = pd.DataFrame({
+        group_column: ["A"],
+        "revenue": [{
+            "missing_column": 1.0,
+            "non_numeric": "not revenue",
+            "missing": np.nan,
+            "infinite": np.inf,
+        }[invalid]],
+    })
+    if invalid == "missing_column":
+        analyzer.dataframe = analyzer.dataframe.drop(columns="revenue")
+    original = analyzer.dataframe.copy(deep=True)
+    with pytest.raises(ValueError) as helper_error:
+        metrics.revenue_boxplot_summary(analyzer.dataframe, group_column)
+    prepare = Mock(wraps=metrics.revenue_boxplot_summary)
+    render = Mock(side_effect=AssertionError("Invalid data must not reach rendering"))
+    monkeypatch.setattr(metrics, "revenue_boxplot_summary", prepare)
+    monkeypatch.setattr(viz, method_name, render)
+    figures_before = plt.get_fignums()
+
+    with pytest.raises(ValueError) as analyzer_error:
+        getattr(analyzer, method_name)()
+
+    assert str(analyzer_error.value) == str(helper_error.value)
+    prepare.assert_called_once()
+    assert prepare.call_args.args[0] is analyzer.dataframe
+    assert prepare.call_args.args[1] == group_column
+    render.assert_not_called()
+    pd.testing.assert_frame_equal(analyzer.dataframe, original)
+    assert plt.get_fignums() == figures_before
+    assert isinstance(plt.show, Mock)
+    plt.show.assert_not_called()
