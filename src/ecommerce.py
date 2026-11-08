@@ -165,6 +165,13 @@ class CommerceAnalyzer:
             self.settings,
         )
 
+    def plot_typical_order(self) -> Figure:
+        orders, unit_counts = metrics.calculate_typical_order_data(self.dataframe)
+        histogram = metrics.order_histogram(self.dataframe)
+        return viz.plot_typical_order(
+            orders, unit_counts, histogram, self.settings,
+        )
+
     def plot_revenue_distribution_city(self) -> Figure:
         summary = metrics.revenue_boxplot_summary(self.dataframe, "city")
         return viz.plot_revenue_distribution_city(summary, self.settings)

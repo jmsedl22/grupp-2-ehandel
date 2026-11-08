@@ -568,6 +568,212 @@ def test_analyzer_order_distribution_uses_combined_orders(settings, empty):
     pd.testing.assert_frame_equal(analyzer.dataframe, original)
 
 
+@pytest.fixture
+def typical_order_source():
+    return pd.DataFrame({
+        "order_id": ["A", "A", "B", "C"],
+        "revenue": [40.0, 60.0, 200.0, 900.0],
+        "units": [1, 2, 1, 5],
+    })
+
+
+@pytest.mark.parametrize("case", ["valid", "prepared", "empty", "empty_units"])
+def test_typical_order_uses_prepared_panels(settings, typical_order_source, case):
+    source = typical_order_source.iloc[:0] if case == "empty" else typical_order_source
+    orders, unit_counts = metrics.calculate_typical_order_data(source)
+    histogram = metrics.order_histogram(source)
+    if case == "prepared":
+        # Different metadata per row and no index 0 expose recomputation/label lookup.
+        columns = ["average_revenue", "median_revenue", "median_units", "average_units"]
+        orders[columns] = -999.0
+        orders.loc[orders.index[0], columns] = [1234.5, 175.0, 2.25, 4.75]
+        orders.index = [7, 2, 9]
+    if case == "empty_units":
+        unit_counts = unit_counts.iloc[:0].copy()
+    originals = [orders.copy(deep=True), unit_counts.copy(deep=True)]
+    histogram_before, settings_before = deepcopy(histogram), deepcopy(settings)
+    rc_before, figures_before = matplotlib.rcParams.copy(), plt.get_fignums()
+    interactive_before = plt.isinteractive()
+
+    with (
+        plt.ion(),
+        patch.object(viz, "_draw_order_histogram", wraps=viz._draw_order_histogram) as draw,
+        patch.object(Axes, "hist", side_effect=AssertionError("Use prepared histogram")),
+        patch.object(Figure, "tight_layout", side_effect=AssertionError("Use _chart")),
+        warnings.catch_warnings(),
+    ):
+        warnings.simplefilter("error")
+        fig = viz.plot_typical_order(orders, unit_counts, histogram, settings)
+        fig.canvas.draw()
+        assert plt.isinteractive()
+
+    assert isinstance(fig, Figure)
+    assert len(fig.axes) == 2
+    assert tuple(fig.get_size_inches()) == pytest.approx((14.0, 4.0))
+    assert [text.get_text() for text in fig.texts] == ["HUR SER EN TYPISK ORDER UT?"]
+    left, right = fig.axes
+    spec = left.get_subplotspec()
+    assert spec is not None
+    assert spec.get_gridspec().ncols == 2
+    for ax in fig.axes:
+        assert ax.get_facecolor() == to_rgba(settings["background_color"])
+        if case == "empty" or (ax is right and case == "empty_units"):
+            assert not ax.axison
+            assert [text.get_text() for text in ax.texts] == ["Inga data"]
+            assert len(ax.patches) == len(ax.lines) == 0
+            assert ax.get_legend() is None
+    if case == "empty":
+        draw.assert_not_called()
+    else:
+        aov, median = (1234.5, 175.0) if case == "prepared" else (400.0, 200.0)
+        draw.assert_called_once()
+        supplied_ax, supplied_histogram, summary, supplied_settings = draw.call_args.args
+        assert supplied_ax is left and supplied_histogram is histogram
+        assert supplied_settings is settings
+        assert summary == {"aov": aov, "median_revenue": median}
+        assert left.get_title() == "FÖRDELNING AV ORDERVÄRDE"
+        assert left.get_xlabel() == "Ordervärde [SEK]"
+        assert left.get_ylabel() == "Antal order"
+        assert len(left.patches) == len(histogram["counts"])
+        assert sum(histogram["counts"]) == 3
+        for bar, start, end, count in zip(
+            left.patches, histogram["bin_edges"][:-1],
+            histogram["bin_edges"][1:], histogram["counts"], strict=True,
+        ):
+            assert isinstance(bar, Rectangle)
+            assert bar.get_x() == pytest.approx(start)
+            assert bar.get_width() == pytest.approx(end - start)
+            assert bar.get_height() == count
+            assert bar.get_facecolor() == to_rgba(settings["histogram_color"])
+            assert bar.get_edgecolor() == to_rgba(settings["background_color"])
+        assert len(left.lines) == 2
+        for line, value in zip(left.lines, [aov, median], strict=True):
+            np.testing.assert_allclose(
+                np.asarray(line.get_xdata(), dtype=float), [value, value],
+            )
+        assert right.get_title() == "ANTAL PRODUKTER PER ORDER"
+        assert right.get_xlabel() == "Antal produkter"
+        assert right.get_ylabel() == "Antal order"
+        if case != "empty_units":
+            assert len(right.patches) == 3
+            for bar, quantity in zip(right.patches, [1, 3, 5], strict=True):
+                assert isinstance(bar, Rectangle)
+                assert bar.get_x() + bar.get_width() / 2 == pytest.approx(quantity)
+                assert bar.get_height() == 1
+                assert bar.get_facecolor() == to_rgba(settings["main_color"])
+                assert bar.get_edgecolor() == to_rgba(settings["background_color"])
+            assert len(right.lines) == 2
+            values = [2.25, 4.75] if case == "prepared" else [3.0, 3.0]
+            for line, value, style, color, zorder in zip(
+                right.lines, values, ["-", "--"], ["median_color", "aov_color"],
+                [3, 4], strict=True,
+            ):
+                np.testing.assert_allclose(
+                    np.asarray(line.get_xdata(), dtype=float), [value, value],
+                )
+                assert line.get_linestyle() == style
+                assert line.get_linewidth() == 2
+                assert line.get_zorder() == zorder
+                assert to_rgba(line.get_color()) == to_rgba(settings[color])
+            legend = right.get_legend()
+            assert legend is not None
+            assert [text.get_text() for text in legend.get_texts()] == (
+                ["Median: 2,25", "Medelvärde: 4,75"] if case == "prepared" else
+                ["Median: 3,00", "Medelvärde: 3,00"]
+            )
+            np.testing.assert_allclose(
+                np.asarray(right.get_xticks(), dtype=float), [1, 3, 5],
+            )
+            for axis in (right.xaxis, right.yaxis):
+                assert axis.get_major_formatter()(1234, 0) == "1 234"
+            ticks = np.asarray(right.get_yticks(), dtype=float)
+            np.testing.assert_allclose(ticks, np.round(ticks))
+            assert right.get_ylim()[0] == 0 < right.get_ylim()[1]
+            assert any(line.get_visible() for line in right.get_ygridlines())
+            assert not any(line.get_visible() for line in right.get_xgridlines())
+    for actual, original in zip([orders, unit_counts], originals, strict=True):
+        pd.testing.assert_frame_equal(actual, original)
+    assert histogram == histogram_before and settings == settings_before
+    assert matplotlib.rcParams == rc_before
+    assert plt.isinteractive() == interactive_before
+    assert plt.get_fignums() == figures_before
+    assert isinstance(plt.show, Mock)
+    plt.show.assert_not_called()
+
+
+@pytest.mark.parametrize("empty", [False, True])
+def test_analyzer_typical_order_forwards_prepared_data(
+    settings, typical_order_source, empty,
+):
+    analyzer = CommerceAnalyzer.__new__(CommerceAnalyzer)
+    analyzer.dataframe = (
+        typical_order_source.iloc[:0].copy() if empty else typical_order_source
+    )
+    analyzer.settings = settings
+    original, settings_before = analyzer.dataframe.copy(deep=True), deepcopy(settings)
+    expected_orders, expected_units = metrics.calculate_typical_order_data(original)
+    expected_histogram = metrics.order_histogram(original)
+    rc_before, figures_before = matplotlib.rcParams.copy(), plt.get_fignums()
+    interactive_before = plt.isinteractive()
+
+    with (
+        patch.object(
+            metrics, "calculate_typical_order_data",
+            wraps=metrics.calculate_typical_order_data,
+        ) as prepare,
+        patch.object(metrics, "order_histogram", wraps=metrics.order_histogram) as histogram,
+        patch.object(viz, "plot_typical_order", wraps=viz.plot_typical_order) as render,
+        patch.object(Axes, "hist", side_effect=AssertionError("Use prepared histogram")),
+        warnings.catch_warnings(),
+    ):
+        warnings.simplefilter("error")
+        fig = analyzer.plot_typical_order()
+        fig.canvas.draw()
+
+    assert isinstance(fig, Figure)
+    render.assert_called_once()
+    for spy in (prepare, histogram):
+        spy.assert_called_once()
+        assert spy.call_args.args[0] is analyzer.dataframe
+    supplied_orders, supplied_units, supplied_histogram, supplied_settings = (
+        render.call_args.args
+    )
+    pd.testing.assert_frame_equal(supplied_orders, expected_orders)
+    pd.testing.assert_frame_equal(supplied_units, expected_units)
+    assert supplied_histogram == expected_histogram
+    assert supplied_settings is settings
+    assert len(fig.axes) == 2
+    if empty:
+        for ax in fig.axes:
+            assert not ax.axison
+            assert [text.get_text() for text in ax.texts] == ["Inga data"]
+            assert len(ax.patches) == len(ax.lines) == 0
+            assert ax.get_legend() is None
+    else:
+        assert supplied_orders["order_revenue"].tolist() == [100.0, 200.0, 900.0]
+        assert supplied_units.to_dict("list") == {
+            "order_units": [1, 3, 5], "order_count": [1, 1, 1],
+        }
+        for ax, positions in zip(fig.axes, [[400.0, 200.0], [3.0, 3.0]], strict=True):
+            assert len(ax.lines) == 2
+            for line, value in zip(ax.lines, positions, strict=True):
+                np.testing.assert_allclose(
+                    np.asarray(line.get_xdata(), dtype=float), [value, value],
+                )
+        heights = []
+        for bar in fig.axes[0].patches:
+            assert isinstance(bar, Rectangle)
+            heights.append(bar.get_height())
+        assert sum(heights) == 3
+    pd.testing.assert_frame_equal(analyzer.dataframe, original)
+    assert settings == settings_before
+    assert matplotlib.rcParams == rc_before
+    assert plt.isinteractive() == interactive_before
+    assert plt.get_fignums() == figures_before
+    assert isinstance(plt.show, Mock)
+    plt.show.assert_not_called()
+
+
 @pytest.mark.parametrize("plotter, group_column", [
     (viz.plot_revenue_distribution_city, "city"),
     (viz.plot_revenue_distribution_category, "category"),

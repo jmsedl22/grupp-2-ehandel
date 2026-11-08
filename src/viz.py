@@ -281,6 +281,70 @@ def plot_monthly_revenue(
         return fig
 
 
+def _draw_order_histogram(
+    ax: Axes,
+    histogram: Mapping[str, list[float] | list[int]],
+    summary: Mapping[str, float],
+    settings: Mapping[str, Any],
+) -> None:
+    ax.set_title("Fördelning av ordervärden")
+    ax.set_xlabel("Ordervärde [SEK]")
+    ax.set_ylabel("Antal order")
+
+    counts = histogram["counts"]
+    if not counts:
+        _empty_chart(ax)
+        return
+
+    edges = histogram["bin_edges"]
+    widths = [
+        right - left
+        for left, right in pairwise(edges)
+    ]
+    ax.bar(
+        edges[:-1],
+        counts,
+        width=widths,
+        align="edge",
+        color=settings["histogram_color"],
+        edgecolor=settings["background_color"],
+    )
+
+    aov = summary["aov"]
+    median = summary["median_revenue"]
+    ax.axvline(
+        aov,
+        color=settings["aov_color"],
+        linestyle="--",
+        linewidth=2,
+        zorder=4,
+        label=f"AOV: {_format_number(aov)} SEK",
+    )
+    ax.axvline(
+        median,
+        color=settings["median_color"],
+        linestyle="-",
+        linewidth=2,
+        zorder=3,
+        label=f"Median: {_format_number(median)} SEK",
+    )
+
+    ax.xaxis.set_major_formatter(
+        ticker.FuncFormatter(
+            lambda value, _position: _format_number(value)
+        )
+    )
+    ax.yaxis.set_major_locator(ticker.MaxNLocator(integer=True))
+    ax.yaxis.set_major_formatter(
+        ticker.FuncFormatter(
+            lambda value, _position: _format_number(value, 0)
+        )
+    )
+    ax.set_ylim(0, max(1.0, max(counts) * 1.2))
+    ax.grid(True, axis="y")
+    ax.legend()
+
+
 def plot_order_value_distribution(
     histogram: Mapping[str, list[float] | list[int]],
     summary: Mapping[str, float],
@@ -290,63 +354,7 @@ def plot_order_value_distribution(
     Creates a bar chart for order value distribution.
     """
     with _chart(settings) as (fig, ax):
-        ax.set_title("Fördelning av ordervärden")
-        ax.set_xlabel("Ordervärde [SEK]")
-        ax.set_ylabel("Antal order")
-
-        counts = histogram["counts"]
-        if not counts:
-            _empty_chart(ax)
-            return fig
-
-        edges = histogram["bin_edges"]
-        widths = [
-            right - left
-            for left, right in pairwise(edges)
-        ]
-        ax.bar(
-            edges[:-1],
-            counts,
-            width=widths,
-            align="edge",
-            color=settings["histogram_color"],
-            edgecolor=settings["background_color"],
-        )
-
-        aov = summary["aov"]
-        median = summary["median_revenue"]
-        ax.axvline(
-            aov,
-            color=settings["aov_color"],
-            linestyle="--",
-            linewidth=2,
-            zorder=4,
-            label=f"AOV: {_format_number(aov)} SEK",
-        )
-        ax.axvline(
-            median,
-            color=settings["median_color"],
-            linestyle="-",
-            linewidth=2,
-            zorder=3,
-            label=f"Median: {_format_number(median)} SEK",
-        )
-
-        ax.xaxis.set_major_formatter(
-            ticker.FuncFormatter(
-                lambda value, _position: _format_number(value)
-            )
-        )
-        ax.yaxis.set_major_locator(ticker.MaxNLocator(integer=True))
-        ax.yaxis.set_major_formatter(
-            ticker.FuncFormatter(
-                lambda value, _position: _format_number(value, 0)
-            )
-        )
-        ax.set_ylim(0, max(1.0, max(counts) * 1.2))
-        ax.grid(True, axis="y")
-        ax.legend()
-
+        _draw_order_histogram(ax, histogram, summary, settings)
         return fig
 
 
@@ -425,85 +433,85 @@ def plot_revenue_distribution_category(
     )
 
 
-def plot_typical_order(df: pd.DataFrame, unit_counts: pd.DataFrame) -> None:
-    """Visualize the value and size of a typical order."""
-    if df.empty:
-        return
+def plot_typical_order(
+    df: pd.DataFrame,
+    unit_counts: pd.DataFrame,
+    histogram: Mapping[str, list[float] | list[int]],
+    settings: Mapping[str, Any],
+) -> Figure:
+    """Visualize prepared order values and units per order."""
+    width, height = settings["figure_size"]
 
-    _fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+    with _chart(
+        settings, ncols=2, figsize=(2 * width, height),
+    ) as (fig, axes):
+        fig.suptitle(
+            "HUR SER EN TYPISK ORDER UT?",
+            fontsize=settings["title_size"],
+            fontweight="bold",
+        )
 
-    # Chart 1: Order value distribution
-    _counts, bins, _patches = axes[0].hist(
-        df["order_revenue"],
-        bins=25,
-        color="skyblue",
-        edgecolor="white"
-    )
+        if df.empty:
+            for ax in axes:
+                _empty_chart(ax)
+            return fig
 
-    axes[0].axvline(
-        df["median_revenue"].iloc[0],
-        color="green",
-        linestyle="--",
-        linewidth=2,
-        label=f"Median: {df["median_revenue"].iloc[0]:.2f} SEK"
-    )
+        summary = {
+            "aov": float(df["average_revenue"].iloc[0]),
+            "median_revenue": float(df["median_revenue"].iloc[0]),
+        }
+        _draw_order_histogram(axes[0], histogram, summary, settings)
+        axes[0].set_title("FÖRDELNING AV ORDERVÄRDE")
 
-    axes[0].axvline(
-        df["average_revenue"].iloc[0],
-        color="purple",
-        linestyle="--",
-        linewidth=2,
-        label=f"Medelvärde: {df["average_revenue"].iloc[0]:.2f} SEK"
-    )
-    axes[0].set_title("FÖRDELNING AV ORDERVÄRDE")
-    axes[0].set_xlabel("Ordervärde [SEK]")
-    axes[0].set_ylabel("Antal order")
-    axes[0].legend()
-    axes[0].set_xticks(bins[::2])
-    axes[0].tick_params(axis="x")
+        ax = axes[1]
+        ax.set_title("ANTAL PRODUKTER PER ORDER")
+        ax.set_xlabel("Antal produkter")
+        ax.set_ylabel("Antal order")
 
-    # Chart 2: Number of products per order
-    axes[1].bar(
-        unit_counts["order_units"],
-        unit_counts["order_count"],
-        color="lightgreen",
-        edgecolor="white",
-    )
+        if unit_counts.empty:
+            _empty_chart(ax)
+            return fig
 
-    axes[1].axvline(
-        df["median_units"].iloc[0],
-        color="green",
-        linestyle="-.",
-        linewidth=2,
-        label=f"Median: {df["median_units"].iloc[0]:.2f}"
-    )
+        ax.bar(
+            unit_counts["order_units"],
+            unit_counts["order_count"],
+            color=settings["main_color"],
+            edgecolor=settings["background_color"],
+        )
 
-    axes[1].axvline(
-        df["average_units"].iloc[0],
-        color="purple",
-        linestyle="-",
-        alpha=0.5,
-        linewidth=2,
-        label=f"Medelvärde: {df["average_units"].iloc[0]:.2f}"
-    )
+        median = df["median_units"].iloc[0]
+        average = df["average_units"].iloc[0]
+        ax.axvline(
+            median,
+            color=settings["median_color"],
+            linestyle="-",
+            linewidth=2,
+            zorder=3,
+            label=f"Median: {_format_number(median)}",
+        )
+        ax.axvline(
+            average,
+            color=settings["aov_color"],
+            linestyle="--",
+            linewidth=2,
+            zorder=4,
+            label=f"Medelvärde: {_format_number(average)}",
+        )
 
-    axes[1].set_title("ANTAL PRODUKTER PER ORDER")
-    axes[1].set_xlabel("Antal produkter")
-    axes[1].set_ylabel("Antal order")
-    axes[1].legend()
-    axes[1].set_xticks(unit_counts["order_units"])
+        ax.set_xticks(unit_counts["order_units"])
+        ax.xaxis.set_major_formatter(
+            ticker.FuncFormatter(
+                lambda value, _position: _format_number(value, 0)
+            )
+        )
+        ax.yaxis.set_major_locator(ticker.MaxNLocator(integer=True))
+        ax.yaxis.set_major_formatter(
+            ticker.FuncFormatter(
+                lambda value, _position: _format_number(value, 0)
+            )
+        )
+        ax.set_ylim(0, max(1.0, unit_counts["order_count"].max() * 1.2))
+        ax.grid(True, axis="y")
+        ax.legend()
 
-    # Formatting
-    for ax in axes:
-        ax.grid(True, axis="y", linewidth=0.3)
-        ax.set_axisbelow(True)
-        ax.tick_params(axis="both", labelsize=8)
-
-    _fig.suptitle(
-        "HUR SER EN TYPISK ORDER UT?",
-        fontsize=16,
-        fontweight="bold"
-    )
-
-    plt.tight_layout()
-    plt.show()
+        return fig
