@@ -344,7 +344,7 @@ def largest_orders_table(
 ) -> Styler:
     leading = ["order_rank", "order_id", "order_revenue"]
     columns = leading + [
-        column for column in rows.columns if column not in leading
+        column for column in rows.columns if column not in leading and column != "revenue"
     ]
     df = rows[columns].reset_index(drop=True)
 
