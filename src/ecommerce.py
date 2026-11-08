@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import TypedDict
 
+from matplotlib.figure import Figure
 from pandas import DataFrame
 from pandas.io.formats.style import Styler
 
@@ -129,12 +130,14 @@ class CommerceAnalyzer:
         category_revenue = self.revenue_by_category()
         viz.plot_revenue_category(category_revenue)
 
-    def plot_revenue_city(self) -> None:
-        city_revenue = self.revenue_by_city()
-        viz.plot_revenue_city(city_revenue)
+    def plot_revenue_city(self) -> Figure:
+        city_revenue = metrics.city_summary(self.dataframe)
+        return viz.plot_revenue_city(city_revenue, self.settings)
 
-    def plot_monthly_revenue(self) -> None:
-        viz.plot_monthly_revenue(self.dataframe)
+    def plot_monthly_revenue(self) -> Figure:
+        summary = metrics.monthly_category_summary(self.dataframe)
+        return viz.plot_monthly_revenue(summary, self.settings)
+
 
     def plot_order_value_distribution(self) -> None:
         order_ranges_df = self.order_ranges()

@@ -1,8 +1,76 @@
+from collections.abc import Iterator, Mapping
+from contextlib import contextmanager
+from math import isfinite
+from typing import Any
+
+import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import pandas as pd
 from matplotlib import ticker
+from matplotlib.axes import Axes
+from matplotlib.figure import Figure
 
-from .metrics import revenue_by_month
+
+@contextmanager
+def _chart(
+    settings: Mapping[str, Any],
+    **subplot_kwargs: Any,
+) -> Iterator[tuple[Figure, Any]]:
+    with (
+        plt.rc_context(rc={
+            "figure.figsize": settings["figure_size"],
+            "figure.facecolor": settings["background_color"],
+            "figure.constrained_layout.use": True,
+            "axes.facecolor": settings["background_color"],
+            "axes.edgecolor": settings["grid_color"],
+            "axes.labelcolor": settings["text_color"],
+            "axes.labelsize": settings["font_size"],
+            "axes.titlesize": settings["title_size"],
+            "axes.titleweight": "bold",
+            "axes.axisbelow": True,
+            "axes.spines.top": False,
+            "axes.spines.right": False,
+            "font.family": settings["font_family"],
+            "font.size": settings["font_size"],
+            "text.color": settings["text_color"],
+            "xtick.color": settings["text_color"],
+            "ytick.color": settings["text_color"],
+            "xtick.labelsize": settings["font_size"],
+            "ytick.labelsize": settings["font_size"],
+            "legend.fontsize": settings["font_size"],
+            "grid.color": settings["grid_color"],
+            "grid.linewidth": 0.6,
+        }),
+        plt.ioff(),
+    ):
+        fig, axes = plt.subplots(**subplot_kwargs)
+        try:
+            yield fig, axes
+        finally:
+            plt.close(fig)
+
+
+def _format_number(value: Any, decimals: int = 2) -> str:
+    if pd.isna(value):
+        return "—"
+
+    if isinstance(value, str):
+        value = pd.to_numeric(value, errors="raise")
+
+    if not isfinite(value):
+        return "—"
+
+    return f"{value:,.{decimals}f}".replace(",", " ").replace(".", ",")
+
+
+def _empty_chart(ax: Axes) -> None:
+    ax.text(
+        0.5, 0.5, "Inga data",
+        transform=ax.transAxes,
+        ha="center",
+        va="center",
+    )
+    ax.set_axis_off()
 
 
 def plot_revenue_category(category_revenue) -> None:
@@ -23,62 +91,100 @@ def plot_revenue_category(category_revenue) -> None:
     plt.show()
 
 
-def plot_revenue_city(city_revenue) -> None:
-    """
-    Creates a bar chart for total revenue by city
-    """
-    _fig, ax = plt.subplots(figsize=(8, 5), constrained_layout=True)
+def plot_revenue_city(
+    city_revenue: pd.DataFrame,
+    settings: Mapping[str, Any],
+) -> Figure:
+    """Create a revenue chart from the prepared city summary."""
+    with _chart(settings) as (fig, ax):
+        ax.set_title("Intäkt per stad")
+        ax.set_xlabel("Intäkt [SEK]")
+        ax.set_ylabel("Stad")
 
-    ax.barh(city_revenue["city"], city_revenue["revenue"], color="lightgreen")
-    ax.set_title("Intäkt per stad", fontsize=16, fontweight= "bold", pad=20)
-    ax.set_xlabel("Intäkt [SEK]", fontsize=14, labelpad=20)
-    ax.xaxis.set_major_formatter(ticker.EngFormatter(unit=""))
-    ax.set_ylabel("Stad", fontsize=14)
-    ax.grid(True, axis="x", linewidth=0.3)
-    ax.invert_yaxis()
-    ax.set_axisbelow(True)
+        if city_revenue.empty:
+            _empty_chart(ax)
+        else:
+            positions = range(len(city_revenue))
+            labels = [
+                "Ej angivet" if pd.isna(city) else str(city)
+                for city in city_revenue["city"]
+            ]
 
-    plt.show()
+            ax.barh(
+                positions,
+                city_revenue["revenue"],
+                color=settings["main_color"],
+            )
+            ax.set_yticks(positions, labels=labels)
+            ax.xaxis.set_major_formatter(
+                ticker.FuncFormatter(
+                    lambda value, _position: _format_number(value)
+                )
+            )
+            ax.grid(True, axis="x")
+            ax.invert_yaxis()
+
+        return fig
 
 
-def plot_monthly_revenue(df: pd.DataFrame) -> None:
-    """
-    Creates a multi-line chart for monthly revenue by category
-    """
-    _fig, ax = plt.subplots(figsize=(8, 5), constrained_layout=True)
+def plot_monthly_revenue(
+    summary: pd.DataFrame,
+    settings: Mapping[str, Any],
+) -> Figure:
+    """Plot prepared monthly category revenues, retaining observation gaps."""
+    with _chart(settings) as (fig, ax):
+        ax.set_title("Intäkt per månad och kategori")
+        ax.set_xlabel("Månad")
+        ax.set_ylabel("Intäkt [SEK]")
 
-    for category in df["category"].unique():
-        category_data = df[df["category"] == category]
-        monthly_data = revenue_by_month(category_data)
+        if summary.empty:
+            _empty_chart(ax)
+        else:
+            for category, group in summary.groupby(
+                "category",
+                dropna=False,
+                observed=True,
+                sort=False,
+            ):
+                ax.plot(
+                    group["month"],
+                    group["revenue"],
+                    marker="o",
+                    linewidth=2,
+                    markersize=6,
+                    label="Ej angivet" if pd.isna(category) else str(category),
+                )
 
-        ax.plot(
-            monthly_data["date"],
-            monthly_data["revenue"],
-            marker="o",
-            linewidth=2,
-            markersize=8,
-            label=category
-        )
+            locator = mdates.AutoDateLocator()
+            ax.xaxis.set_major_locator(locator)
+            ax.xaxis.set_major_formatter(
+                mdates.ConciseDateFormatter(locator)
+            )
+            ax.yaxis.set_major_formatter(
+                ticker.FuncFormatter(
+                    lambda value, _position: _format_number(value)
+                )
+            )
+            ax.legend(title="Kategori")
+            ax.grid(True, axis="y")
 
-    ax.yaxis.set_major_formatter(ticker.EngFormatter(unit=""))
-    ax.set_title("Intäkt per månad och kategori", fontsize=16, fontweight= "bold", pad=20)
-    ax.set_xlabel("Månad", fontsize=14, labelpad=20)
-    ax.set_ylabel("Intäkt [SEK]", fontsize=14, labelpad=20)
-    ax.legend(title="Kategori", loc="upper right", ncol=3)
-    ax.grid(True, axis="y", linewidth=0.3)
-
-    plt.show()
+        return fig
 
 
 def plot_order_value_distribution(df: pd.DataFrame) -> None:
     """
     Creates a bar chart for order value distribution
     """
+    _fig, ax = plt.subplots(figsize=(8, 5), constrained_layout=True)
+
+    if df.empty:
+        _empty_chart(ax)
+        plt.show()
+        return
+
     number_of_orders = df["number of orders"].to_list()
     percentages = df["percentages"].to_list()
     labels = df.index.to_list()
-
-    _fig, ax = plt.subplots(figsize=(8, 5), constrained_layout=True)
     bars = ax.bar(labels, number_of_orders, color="darkorange")
 
     for bar, percentage in zip(bars, percentages):
@@ -98,7 +204,7 @@ def plot_order_value_distribution(df: pd.DataFrame) -> None:
     ax.set_xlabel("Orderintäkt intervall [SEK]", fontsize=14, labelpad=20)
     ax.set_ylabel("Antal beställningar", fontsize=14, labelpad=20)
     ax.tick_params(axis="x", rotation=15)
-    ax.set_ylim(0, max(number_of_orders) * 1.2)
+    ax.set_ylim(0, max(1.0, max(number_of_orders) * 1.2))
     ax.grid(True, axis="y", linewidth=0.3)
     ax.set_axisbelow(True)
 
@@ -120,7 +226,7 @@ def plot_revenue_distribution_city(df: pd.DataFrame) -> None:
     bp = ax.boxplot(
         revenue_by_city,
         tick_labels=[str(city) for city in cities],
-        vert=False,
+        orientation="horizontal",
         patch_artist=True,
     )
     colors = ["lightcyan", "lightblue", "dodgerblue", "steelblue", "darkblue"]
@@ -154,7 +260,7 @@ def plot_revenue_distribution_category(df: pd.DataFrame) -> None:
     bp = ax.boxplot(
         revenue_by_category,
         tick_labels=[str(category) for category in categories],
-        vert=False,
+        orientation="horizontal",
         patch_artist=True,
     )
     colors = ["thistle", "plum", "mediumorchid", "blueviolet", "indigo"]
