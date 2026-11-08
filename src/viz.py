@@ -1,5 +1,6 @@
 from collections.abc import Generator, Mapping
 from contextlib import contextmanager
+from itertools import pairwise
 from math import isfinite
 from textwrap import fill
 from typing import Any
@@ -265,7 +266,7 @@ def plot_order_value_distribution(
         edges = histogram["bin_edges"]
         widths = [
             right - left
-            for left, right in zip(edges, edges[1:])
+            for left, right in pairwise(edges)
         ]
         ax.bar(
             edges[:-1],
