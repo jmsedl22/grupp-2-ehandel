@@ -1,4 +1,5 @@
 from collections.abc import Mapping, Sequence
+from html import escape
 from math import isfinite
 from typing import Any
 
@@ -395,10 +396,9 @@ def largest_orders_table(
             subset=list(formatters),
             escape="html",
         )
-        .format_index(
-            headings.__getitem__,
+        .relabel_index(
+            [escape(headings[column]) for column in df.columns],
             axis="columns",
-            escape="html",
         )
         .set_properties(
             subset=pd.IndexSlice[new_order, :],

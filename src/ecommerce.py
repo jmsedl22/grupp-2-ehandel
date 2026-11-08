@@ -96,6 +96,9 @@ class CommerceAnalyzer:
         return tables.monthly_table(result, self.settings)
 
     def largest_orders_table(self, limit: int = 5) -> Styler:
+        if isinstance(limit, bool):
+            raise TypeError("limit must be a positive integer")
+
         result = metrics.largest_orders(self.dataframe, n=limit)
         return tables.largest_orders_table(result["rows"], self.settings)
 
