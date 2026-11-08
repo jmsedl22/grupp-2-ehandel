@@ -31,12 +31,6 @@ def _format_number(value: Any, decimals: int) -> str:
 
     return f"{value:,.{decimals}f}".replace(",", " ").replace(".", ",")
 
-def _format_number(value: Any, decimals: int) -> str:
-    if pd.isna(value) or not isfinite(value):
-        return MISSING
-
-    return f"{value:,.{decimals}f}".replace(",", " ").replace(".", ",")
-
 
 def format_count(value: Any) -> str:
     return _format_number(value, 0)
