@@ -281,6 +281,42 @@ def plot_monthly_revenue(
         return fig
 
 
+def plot_revenue_by_weekday(
+    summary: pd.DataFrame,
+    settings: Mapping[str, Any],
+) -> Figure:
+    """Plot total observed weekday revenue in the prepared order."""
+    weekdays = {
+        "Monday": "Måndag", "Tuesday": "Tisdag", "Wednesday": "Onsdag",
+        "Thursday": "Torsdag", "Friday": "Fredag", "Saturday": "Lördag",
+        "Sunday": "Söndag",
+    }
+
+    with _chart(settings) as (fig, ax):
+        ax.set_title("Observerade intäkter per veckodag")
+        ax.set_xlabel("Veckodag")
+        ax.set_ylabel("Intäkt [SEK]")
+
+        if summary.empty:
+            _empty_chart(ax)
+            return fig
+
+        positions = range(len(summary))
+        ax.bar(positions, summary["revenue"], color=settings["main_color"])
+        ax.set_xticks(
+            positions,
+            labels=[weekdays[day] for day in summary["weekday"]],
+        )
+        ax.yaxis.set_major_formatter(
+            ticker.FuncFormatter(
+                lambda value, _position: _format_number(value)
+            )
+        )
+        ax.grid(True, axis="y")
+
+        return fig
+
+
 def _draw_order_histogram(
     ax: Axes,
     histogram: Mapping[str, list[float] | list[int]],
@@ -382,7 +418,7 @@ def _revenue_boxplot(
 
     with _chart(settings, figsize=(width, height)) as (fig, ax):
         ax.set_title(title)
-        ax.set_xlabel("Radintäkt [SEK]")
+        ax.set_xlabel("Orderintäkt [SEK]")
         ax.set_ylabel(group_label)
 
         if not stats:

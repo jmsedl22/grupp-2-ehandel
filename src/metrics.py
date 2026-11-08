@@ -219,15 +219,8 @@ def top_categories_summary(df: DataFrame, n: int = 3) -> DataFrame:
 
 
 def data_overview(df: DataFrame) -> dict[str, object]:
-    """Return data-quality counts, date bounds, and dates without observations.
-
-    Missing values and numeric infinities are allowed. Discrepancy checks
-    include only rows with present, finite price, units, and revenue values.
-    Missing-value and duplicate counts use the original input.
-
-    Invalid dates are excluded from date bounds and calendar coverage.
-    Dates without observations do not establish that sales were zero.
-    Empty input with required columns returns zero counts and no date range.
+    """
+    Return data-quality counts, date bounds, and dates.
     """
     required_cols = {"date", "order_id", "price", "units", "revenue"}
     missing_cols = required_cols - set(df.columns)
@@ -309,8 +302,6 @@ def data_overview(df: DataFrame) -> dict[str, object]:
 def order_totals(df: DataFrame) -> DataFrame:
     """
     Return order_id and summed, unrounded revenue, sorted by revenue descending.
-    Raise ValueError for missing required columns, missing order IDs,
-    or non-numeric, missing, or infinite revenue. Negative revenue is allowed.
     """
     required_cols = {"order_id", "revenue"}
     missing_cols = required_cols - set(df.columns)
@@ -350,10 +341,6 @@ def order_histogram(
 ) -> dict[str, list[float] | list[int]]:
     """
     Return histogram bin_edges and counts for combined orders.
-
-    Each bin includes its left boundary and excludes its right boundary,
-    (except the final bin). NumPy determines the range, expanding it
-    automatically for constant order revenues.
     """
     if (not isinstance(bins, (int, np.integer)) or bins <= 0):
         raise ValueError("bins must be a positive integer")
@@ -377,8 +364,7 @@ def order_histogram(
 def order_summary(df: DataFrame) -> dict[str, float]:
     """
     Return statistics for combined order revenues using linear quantile
-    interpolation. Invalid input raises ValueError. Empty input with required
-    columns still returns all seven keys.
+    interpolation.
     """
     aov = calculate_aov(df)
     distribution = calculate_order_value_distribution(df)
@@ -398,10 +384,6 @@ def order_summary(df: DataFrame) -> dict[str, float]:
 def large_order_summary(df: DataFrame) -> dict[str, float | int]:
     """
     Summarize combined orders strictly above Q3 + 1.5 times IQR.
-
-    Empty input returns a NaN threshold and shares, zero orders, and
-    0.0 revenue. Revenue share is NaN when total order revenue is zero.
-    Constant order values produce no large orders.
     """
     orders = order_totals(df)
 
@@ -442,16 +424,6 @@ def large_order_summary(df: DataFrame) -> dict[str, float | int]:
 def largest_orders(df: DataFrame, n: int = 5) -> dict[str, DataFrame]:
     """
     Return the largest combined orders and rows.
-
-    The orders table contains rank, order_id, and combined revenue.
-    Revenue ties are resolved by ascending order ID, with consecutive ranks.
-
-    The rows table preserves every original column and value, followed by
-    order_rank and order_revenue. Rows are arranged by order rank while
-    preserving their original relative order within each order.
-
-    Require a positive integer n. Reject existing order_rank or
-    order_revenue columns. Empty input retains both tables' column schemas.
     """
     if not isinstance(n, (int, np.integer)) or n <= 0:
         raise ValueError("n must be a positive integer")
@@ -535,15 +507,8 @@ def revenue_by_month(df: DataFrame)  -> DataFrame:
 
 
 def monthly_summary(df: DataFrame) -> DataFrame:
-    """Return chronological monthly revenue, order counts, and daily coverage.
-
-    An order ID appearing in multiple months counts once in each month.
-    Observing every calendar date does not guarantee every transaction
-    was captured. Revenue per day is reported only for fully observed months.
-
-    Unobserved months within the range have zero counts and NaN financial
-    metrics. Empty input with required columns returns a typed empty table.
-    Invalid input raises ValueError. Dates are timezone-naive.
+    """
+    Return chronological monthly revenue, order counts, and daily coverage.
     """
     required_cols = {"date", "order_id", "revenue"}
     missing_cols = required_cols - set(df.columns)
@@ -650,14 +615,6 @@ def monthly_summary(df: DataFrame) -> DataFrame:
 def monthly_category_summary(df: DataFrame) -> DataFrame:
     """
     Return month, category and revenue in chronological order.
-
-    Observed categories share one monthly range, from the earliest
-    to the latest month across the entire input. Missing category labels
-    remain a separate group. NaN revenue means no observations for that
-    month/category combination.
-
-    Empty input with required columns returns a typed empty table.
-    Invalid input raises ValueError. Dates are expected to be timezone-naive.
     """
     required_cols = {"date", "category", "revenue"}
     missing_cols = required_cols - set(df.columns)

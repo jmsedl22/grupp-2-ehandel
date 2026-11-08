@@ -5,6 +5,7 @@ Group assignment for a course in Python programming. The project aims to build a
 Requires Python 3 (tested with 3.14.7). From the repository root in Windows PowerShell, run:
 
 ```powershell
+python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 $env:PYTHONPATH = (Get-Location).Path  # Sets the local env, just in case
 .\.venv\Scripts\python.exe -m jupyterlab notebook/ecommerce_sales.ipynb
@@ -50,6 +51,7 @@ Responsibilities are divided by file, but subject to change as work progresses.
 - Katerina - metrics.py
 - Natasa - viz.py
 - Jacob - ecommerce_sales.ipynb, README.md (documentation), and final check
+- Tanveer - CommerceAnalyzer type definitions and order-metric tests.
 
 ## Architecture
 `CommerceAnalyzer` in `src/ecommerce.py` loads data and coordinates calculations and presentation.
