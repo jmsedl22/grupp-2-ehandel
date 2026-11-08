@@ -79,6 +79,14 @@ class CommerceAnalyzer:
         result = metrics.top_categories_summary(self.dataframe, n=3)
         return tables.top_categories_table(result, self.settings)
 
+    def data_overview_table(self) -> Styler:
+        result = metrics.data_overview(self.dataframe)
+        return tables.data_overview_table(result, self.settings)
+
+    def order_summary_table(self) -> Styler:
+            result = metrics.order_summary(self.dataframe)
+            return tables.order_summary_table(result, self.settings)
+
     def revenue_by_category(self) -> DataFrame:
         return metrics.revenue_by_category(self.dataframe)
 

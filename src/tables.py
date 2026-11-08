@@ -225,3 +225,31 @@ def data_overview_table(
         "Dataöversikt",
         numeric_columns=["Värde"],
     )
+
+
+def order_summary_table(
+    summary: Mapping[str, Any],
+    settings: Mapping[str, Any],
+) -> Styler:
+    labels = {
+        "aov": "Genomsnittligt ordervärde",
+        "median_revenue": "Median",
+        "min_revenue": "Minimum",
+        "max_revenue": "Maximum",
+        "q1": "Första kvartilen (Q1)",
+        "q3": "Tredje kvartilen (Q3)",
+        "iqr": "Kvartilavstånd (IQR)",
+    }
+
+    rows = [
+        (label, format_amount(summary[key]))
+        for key, label in labels.items()
+    ]
+    df = pd.DataFrame(rows, columns=["Mätning", "Värde"])
+
+    return _style_table(
+        df,
+        settings,
+        "Orderstatistik",
+        numeric_columns=["Värde"],
+    )
