@@ -1,4 +1,4 @@
-from collections.abc import Iterator, Mapping
+from collections.abc import Generator, Mapping
 from contextlib import contextmanager
 from math import isfinite
 from typing import Any
@@ -15,7 +15,7 @@ from matplotlib.figure import Figure
 def _chart(
     settings: Mapping[str, Any],
     **subplot_kwargs: Any,
-) -> Iterator[tuple[Figure, Any]]:
+) -> Generator[tuple[Figure, Any], None, None]:
     with (
         plt.rc_context(rc={
             "figure.figsize": settings["figure_size"],
