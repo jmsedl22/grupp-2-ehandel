@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from pandas import DataFrame
+from pandas import DataFrame  # Short-hand import for DataFrame only
 
 
 def calculate_aov(df: DataFrame) -> float:
@@ -35,6 +35,7 @@ def calculate_total_revenue(df: DataFrame) -> float:
 
     # Return total revenue as a float
     return float(total_revenue)
+
 
 # Calculate total number of units sold
 def calculate_total_units(df: DataFrame) -> int:
@@ -140,40 +141,72 @@ def city_summary(df: DataFrame) -> DataFrame:
     return _group_revenue_summary(df, "city")
 
 
-def revenue_boxplot_summary(df: DataFrame, group_by: str,) ->list[dict[str, object]]:
-    """ Return boxplot statistics using individual row revenues"""
-    if df.empty:
-        return[]
-
+def revenue_boxplot_summary(
+    df: DataFrame,
+    group_by: str,
+) -> list[dict[str, object]]:
+    """Return boxplot statistics using individual row revenues."""
     if group_by not in ("city", "category"):
         raise ValueError("group_by must be city or category")
-    
-    result =[]
 
-    
-    for label, group in df.groupby(group_by, dropna=False):
+    required_cols = {group_by, "revenue"}
+    missing_cols = required_cols - set(df.columns)
+
+    if missing_cols:
+        raise ValueError(
+            f"Missing required columns: {', '.join(sorted(missing_cols))}")
+
+    df_required = df[[group_by, "revenue"]].copy()
+
+    try:
+        revenue = pd.to_numeric(df_required["revenue"], errors="raise")
+    except (ValueError, TypeError) as exc:
+        raise ValueError("Revenue must contain numeric values") from exc
+
+    if revenue.isna().any():
+        raise ValueError("Revenue cannot contain missing values")
+
+    if not np.isfinite(revenue.to_numpy(dtype=float)).all():
+        raise ValueError("Revenue must contain finite values")
+
+    df_required["revenue"] = revenue
+
+    if df_required.empty:
+        return []
+
+    result = []
+
+    for label, group in df_required.groupby(group_by, dropna=False):
         values = group["revenue"]
 
-        q1, med, q3 = values.quantile([0.25, 0.5, 0.75], interpolation="linear")
-        iqr = q3-q1
+        q1, med, q3 = values.quantile(
+            [0.25, 0.5, 0.75],
+            interpolation="linear"
+        )
 
-        low=q1-1.5*iqr
-        high=q3+1.5*iqr
+        iqr = q3 - q1
+        low = q1 - 1.5 * iqr
+        high = q3 + 1.5 * iqr
 
-        inside = values.between(low, high)
+        inside = values.between(low, high, inclusive="both")
         result.append({
-            "label": str(label),
+            "label": label,
             "med": float(med),
             "q1": float(q1),
             "q3": float(q3),
-            "whislo": float(values[inside].min()), 
+            "whislo": float(values[inside].min()),
             "whishi": float(values[inside].max()),
             "fliers": values[~inside].astype(float).tolist(),
         })
 
-    return sorted(result, key=lambda x: (x["med"], x["label"]))
-
-
+    return sorted(
+        result,
+        key=lambda x: (
+            x["med"],
+            pd.isna([x["label"]])[0],
+            str(x["label"]),
+        ),
+    )
 
 
 def top_categories_summary(df: DataFrame, n: int = 3) -> DataFrame:
@@ -509,7 +542,6 @@ def monthly_summary(df: DataFrame) -> DataFrame:
     metrics. Empty input with required columns returns a typed empty table.
     Invalid input raises ValueError. Dates are timezone-naive.
     """
-
     required_cols = {"date", "order_id", "revenue"}
     missing_cols = required_cols - set(df.columns)
 
@@ -785,6 +817,7 @@ def calculate_order_ranges(df: DataFrame) -> DataFrame:
 
     return result
 
+
 # Calculate standard deviation of order values
 def calculate_order_value_std(df: DataFrame) -> float:
     # Calculate total revenue for each order
@@ -874,7 +907,6 @@ def calculate_descriptive_statistics(df:DataFrame) -> dict:
 
 # Detect outliners in order values using the IQR methot
 def detect_outliers(df: DataFrame) -> DataFrame:
-
     orders = order_totals(df)
     stats = calculate_descriptive_statistics(df)
 
@@ -886,7 +918,7 @@ def detect_outliers(df: DataFrame) -> DataFrame:
     q3 = stats["q3"]
     iqr = stats["iqr"]
 
-    # Calculate lower and upper outlier boundalies
+    # Calculate lower and upper outlier boundaries
     lower_bound = q1 - 1.5 * iqr
     upper_bound = q3 + 1.5 * iqr
 
@@ -896,6 +928,7 @@ def detect_outliers(df: DataFrame) -> DataFrame:
     ]
 
     return outliers
+
 
 def calculate_order_z_scores(df: DataFrame) -> DataFrame:
     orders = order_totals(df)
@@ -930,15 +963,43 @@ def calculate_units_revenue_correlation(df: DataFrame) -> float:
 
 
 # Calculate orders value, units per order, and summary statics
-def calculate_typical_order_data(df:pd.DataFrame) -> pd.DataFrame:
-    orders =df.groupby("order_id").agg(order_revenue=("revenue", "sum"),
-    order_units=("units", "sum")).reset_index()
-    
+def calculate_typical_order_data(df: DataFrame) -> tuple[DataFrame, DataFrame]:
+    required_cols = {"order_id", "revenue", "units"}
+    missing_cols = required_cols - set(df.columns)
 
-    orders["median_revenue"] = calculate_order_value_distribution(df)["median_revenue"]
+    if missing_cols:
+        raise ValueError(
+            f"Missing required columns: {', '.join(sorted(missing_cols))}")
+
+    df = df[["order_id", "revenue", "units"]].copy()
+
+    calculate_total_units(df)
+    df["units"] = pd.to_numeric(df["units"], errors="raise")
+
+    orders = order_totals(df).rename(columns={"revenue": "order_revenue"})
+
+    if orders.empty:
+        return (
+            DataFrame(columns=[
+                "order_id", "order_revenue", "order_units",
+                "median_revenue", "median_units",
+                "average_revenue", "average_units",
+            ]),
+            DataFrame(columns=["order_units", "order_count"]),
+        )
+
+    order_units = df.groupby("order_id").agg(order_units=("units", "sum"))
+    orders = orders.join(order_units, on="order_id")
+    orders = orders.sort_values("order_id").reset_index(drop=True)
+
+    orders["median_revenue"] = calculate_order_value_distribution(df)[
+        "median_revenue"
+    ]
     orders["median_units"] = orders["order_units"].median()
     orders["average_revenue"] = calculate_aov(df)
     orders["average_units"] = calculate_total_units(df)/count_orders(df)
-    unit_counts = (orders.groupby("order_units").size().reset_index(name="order_count"))
-    
+    unit_counts = (orders.groupby("order_units")
+        .size()
+        .reset_index(name="order_count"))
+
     return orders, unit_counts

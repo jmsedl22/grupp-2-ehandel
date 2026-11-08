@@ -135,9 +135,7 @@ def plot_revenue_distribution_city(df: pd.DataFrame) -> None:
 
 
 def plot_revenue_distribution_category(df: pd.DataFrame) -> None:
-    """
-    Creates a box plot for revenue distribution by category
-    """
+    """Creates a box plot for revenue distribution by category."""
     revenue_groups = df.groupby("category")["revenue"]
     categories = revenue_groups.median().sort_values(ascending=True).index
     revenue_by_category = [
@@ -161,12 +159,14 @@ def plot_revenue_distribution_category(df: pd.DataFrame) -> None:
     ax.set_xlabel("Orderintäkt [SEK]", fontsize=14, labelpad=20)
     ax.set_ylabel("Kategori", fontsize=14, labelpad=20)
     ax.grid(True, axis="x", linewidth=0.3)
-    
+
     plt.show()
 
 
 def plot_typical_order(df: pd.DataFrame, unit_counts: pd.DataFrame) -> None:
     """Visualize the value and size of a typical order."""
+    if df.empty:
+        return
 
     fig, axes = plt.subplots(1, 2, figsize=(14, 5))
 
@@ -215,7 +215,7 @@ def plot_typical_order(df: pd.DataFrame, unit_counts: pd.DataFrame) -> None:
             linewidth=2,
             label=f"Median: {df["median_units"].iloc[0]:.2f}"
         )
-    
+
     axes[1].axvline(
         df["average_units"].iloc[0],
         color="purple",
@@ -245,4 +245,3 @@ def plot_typical_order(df: pd.DataFrame, unit_counts: pd.DataFrame) -> None:
 
     plt.tight_layout()
     plt.show()
-
