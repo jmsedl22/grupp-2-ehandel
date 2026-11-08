@@ -115,3 +115,58 @@ def summary_table(
     ], columns=["Mätning", "Värde"])
 
     return _style_table(df, settings, "Nyckeltal", numeric_columns=["Värde"])
+
+
+def _revenue_table(
+    summary: pd.DataFrame,
+    settings: Mapping[str, Any],
+    group_column: str,
+    group_heading: str,
+    caption: str,
+) -> Styler:
+    df = summary[[group_column, "revenue", "share_pct"]].rename(columns={
+        group_column: group_heading,
+        "revenue": "Intäkter",
+        "share_pct": "Andel av totala intäkter",
+    })
+
+    return _style_table(
+        df,
+        settings,
+        caption,
+        numeric_columns=["Intäkter", "Andel av totala intäkter"],
+    ).format({
+        group_heading: format_label,
+        "Intäkter": format_amount,
+        "Andel av totala intäkter": format_percentage,
+    }, escape="html")
+
+
+def category_table(
+    summary: pd.DataFrame,
+    settings: Mapping[str, Any],
+) -> Styler:
+    return _revenue_table(
+        summary, settings,
+        "category", "Kategori", "Intäkter per kategori",
+    )
+
+
+def city_table(
+    summary: pd.DataFrame,
+    settings: Mapping[str, Any],
+) -> Styler:
+    return _revenue_table(
+        summary, settings,
+        "city", "Stad", "Intäkter per stad",
+    )
+
+
+def top_categories_table(
+    summary: pd.DataFrame,
+    settings: Mapping[str, Any],
+) -> Styler:
+    return _revenue_table(
+        summary, settings,
+        "category", "Kategori", "Topp 3 kategorier",
+    )
