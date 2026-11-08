@@ -194,37 +194,12 @@ def data_overview_table(
     overview: Mapping[str, Any],
     settings: Mapping[str, Any],
 ) -> Styler:
-    count_labels = {
-        "row_count": "Antal rader",
-        "order_count": "Unika order",
-        "missing_values_total": "Saknade värden totalt",
-        "duplicate_row_count": "Exakta dubblettrader",
-        "negative_numeric_row_count": "Rader med negativa numeriska värden",
-        "price_units_discrepancy_count": (
-            "Avvikelser mellan pris × antal och intäkt"
-        ),
-    }
-
     rows = [
         ("Första datum", format_date(overview["date_min"])),
         ("Sista datum", format_date(overview["date_max"])),
+        ("Antal rader", format_count(overview["row_count"])),
+        ("Unika order", format_count(overview["order_count"])),
     ]
-
-    rows.extend(
-        (label, format_count(overview[key]))
-        for key, label in count_labels.items()
-    )
-
-    rows.extend(
-        (f"Saknade värden: {column}", format_count(count))
-        for column, count in overview["missing_values_by_column"].items()
-    )
-
-    missing_dates = ", ".join(
-        format_date(date)
-        for date in overview["dates_without_observations"]
-    )
-    rows.append(("Datum utan observationer", missing_dates or "Inga"))
 
     df = pd.DataFrame(rows, columns=["Mätning", "Värde"])
 
