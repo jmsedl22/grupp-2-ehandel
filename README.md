@@ -75,15 +75,15 @@ The project structure follows the proposed template given in the assignment desc
 ```
 grupp-2-ehandel/
 ├── data/
-│   └── ecommerce_sales.csv   # Input dataset for the analysis
+│   └── ecommerce_sales.csv    # Input dataset for the analysis
 ├── notebook/
-│   └── ecommerce_sales.ipynb # Main analysis notebook
+│   └── ecommerce_sales.ipynb  # Main analysis notebook
 ├── src/
-│   ├── ecommerce.py          # E-commerce analysis, notebook interface
-│   ├── io_utils.py           # Data loading, file handling
-│   ├── metrics.py            # Sales metric calculations
-│   ├── tables.py             # Styling the tables
-│   └── viz.py                # Charts, visualizations
+│   ├── ecommerce.py           # E-commerce analysis, notebook interface
+│   ├── io_utils.py            # Data loading, file handling
+│   ├── metrics.py             # Sales metric calculations
+│   ├── tables.py              # Styling the tables
+│   └── viz.py                 # Charts, visualizations
 ├── .gitignore
 └── README.md
 ```
