@@ -335,7 +335,7 @@ def monthly_table(
     ).format({
         labels["month"]: format_month,
         **numerics,
-    }, escape="html")
+    }, escape="html").hide(subset=["Observerade dagar", "Datumtäckning"], axis="columns")
 
 
 def largest_orders_table(
