@@ -20,6 +20,18 @@ COLUMN_LABELS = {
 
 
 def _format_number(value: Any, decimals: int) -> str:
+    if pd.isna(value):
+        return MISSING
+
+    if isinstance(value, str):
+        value = pd.to_numeric(value, errors="raise")
+
+    if not isfinite(value):
+        return MISSING
+
+    return f"{value:,.{decimals}f}".replace(",", " ").replace(".", ",")
+
+def _format_number(value: Any, decimals: int) -> str:
     if pd.isna(value) or not isfinite(value):
         return MISSING
 
