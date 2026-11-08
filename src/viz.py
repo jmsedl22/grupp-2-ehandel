@@ -102,10 +102,8 @@ def plot_revenue_category(
     ]
 
     width, height = settings["figure_size"]
-    height = max(
-        height,
-        1.8 + 0.4 * sum(label.count("\n") + 1 for label in labels),
-    )
+    line_count = sum(label.count("\n") + 1 for label in labels)
+    height = max(height, 1.8 + 0.4 * line_count)
 
     with _chart(settings, figsize=(width, height)) as (fig, ax):
         ax.set_title(
@@ -117,33 +115,34 @@ def plot_revenue_category(
 
         if category_revenue.empty:
             _empty_chart(ax)
-        else:
-            positions = range(len(category_revenue))
-            bars = ax.barh(
-                positions,
+            return fig
+
+        positions = range(len(category_revenue))
+        bars = ax.barh(
+            positions,
+            category_revenue["revenue"],
+            color=settings["main_color"],
+        )
+        ax.set_yticks(positions, labels=labels)
+
+        annotations = [
+            f"{_format_number(revenue)} SEK "
+            f"({_format_percentage(share)})"
+            for revenue, share in zip(
                 category_revenue["revenue"],
-                color=settings["main_color"],
+                category_revenue["share_pct"],
             )
-            ax.set_yticks(positions, labels=labels)
+        ]
+        ax.bar_label(bars, labels=annotations, padding=5)
 
-            annotations = [
-                f"{_format_number(revenue)} SEK "
-                f"({_format_percentage(share)})"
-                for revenue, share in zip(
-                    category_revenue["revenue"],
-                    category_revenue["share_pct"],
-                )
-            ]
-            ax.bar_label(bars, labels=annotations, padding=5)
-
-            ax.xaxis.set_major_formatter(
-                ticker.FuncFormatter(
-                    lambda value, _position: _format_number(value)
-                )
+        ax.xaxis.set_major_formatter(
+            ticker.FuncFormatter(
+                lambda value, _position: _format_number(value)
             )
-            ax.margins(x=0.4)
-            ax.grid(True, axis="x")
-            ax.invert_yaxis()
+        )
+        ax.margins(x=0.4)
+        ax.grid(True, axis="x")
+        ax.invert_yaxis()
 
         return fig
 
