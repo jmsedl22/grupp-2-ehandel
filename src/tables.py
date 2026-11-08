@@ -327,3 +327,81 @@ def monthly_table(
         labels["month"]: format_month,
         **numerics,
     }, escape="html")
+
+
+def largest_orders_table(
+    rows: pd.DataFrame,
+    settings: Mapping[str, Any],
+) -> Styler:
+    leading = ["order_rank", "order_id", "order_revenue"]
+    columns = leading + [
+        column for column in rows.columns if column not in leading
+    ]
+    df = rows[columns].reset_index(drop=True)
+
+    labels = {
+        "order_rank": "Placering",
+        "order_id": "Order-ID",
+        "order_revenue": "Orderintäkt",
+        "date": "Datum",
+        "city": COLUMN_LABELS["city"],
+        "category": COLUMN_LABELS["category"],
+        "price": "Pris",
+        "units": "Antal enheter",
+        "revenue": "Radintäkt",
+    }
+
+    headings: dict[object, str] = {
+        column: labels.get(column, str(column))
+        for column in df.columns
+    }
+
+    formatters = {
+        "order_rank": format_count,
+        "order_id": str,
+        "order_revenue": format_amount,
+        "date": format_date,
+        "city": format_label,
+        "category": format_label,
+        "price": format_amount,
+        "units": format_count,
+        "revenue": format_amount,
+    }
+    formatters = {
+        column: formatter
+        for column, formatter in formatters.items()
+        if column in df.columns
+    }
+    new_order = df["order_rank"].ne(df["order_rank"].shift())
+
+    return (
+        _style_table(
+            df,
+            settings,
+            "Största order. ",
+            numeric_columns=df.select_dtypes(
+                include="number"
+            ).columns.tolist(),
+        )
+        .format(
+            precision=2,
+            decimal=",",
+            thousands=" ",
+            na_rep=MISSING,
+            escape="html",
+        )
+        .format(
+            formatters,
+            subset=list(formatters),
+            escape="html",
+        )
+        .format_index(
+            headings.__getitem__,
+            axis="columns",
+            escape="html",
+        )
+        .set_properties(
+            subset=pd.IndexSlice[new_order, :],
+            **{"border-top": f"2px solid {settings['main_color']}"},
+        )
+    )
