@@ -1,4 +1,3 @@
-from numbers import Integral
 from pathlib import Path
 from typing import TypedDict
 
@@ -97,14 +96,7 @@ class CommerceAnalyzer:
         return tables.monthly_table(result, self.settings)
 
     def largest_orders_table(self, limit: int = 5) -> Styler:
-        if (
-            isinstance(limit, bool)
-            or not isinstance(limit, Integral)
-            or limit <= 0
-        ):
-            raise ValueError("limit must be a positive integer")
-
-        result = metrics.largest_orders(self.dataframe, n=int(limit))
+        result = metrics.largest_orders(self.dataframe, n=limit)
         return tables.largest_orders_table(result["rows"], self.settings)
 
     def revenue_by_category(self) -> DataFrame:
