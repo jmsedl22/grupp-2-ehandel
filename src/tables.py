@@ -332,7 +332,7 @@ def largest_orders_table(
         "category": COLUMN_LABELS["category"],
         "price": "Pris",
         "units": "Antal enheter",
-        "revenue": "Radintäkt",
+        "revenue": "Orderintäkt",
     }
 
     headings: dict[object, str] = {

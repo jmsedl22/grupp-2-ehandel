@@ -908,7 +908,7 @@ def test_boxplots_are_horizontal_without_warnings(settings, plotter, group_colum
 
     assert isinstance(fig, Figure)
     ax = fig.axes[0]
-    assert ax.get_xlabel() == "Radintäkt [SEK]"
+    assert ax.get_xlabel() == "Orderintäkt [SEK]"
     assert ax.get_ylabel() == {"city": "Stad", "category": "Kategori"}[group_column]
     assert ax.get_title() == {
         "city": "Intäktsfördelning per stad",

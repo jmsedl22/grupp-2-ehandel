@@ -418,7 +418,7 @@ def _revenue_boxplot(
 
     with _chart(settings, figsize=(width, height)) as (fig, ax):
         ax.set_title(title)
-        ax.set_xlabel("Radintäkt [SEK]")
+        ax.set_xlabel("Orderintäkt [SEK]")
         ax.set_ylabel(group_label)
 
         if not stats:
